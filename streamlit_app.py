@@ -50,17 +50,16 @@ if uploaded_file is not None:
     with st.spinner("AIが採点中です..."):
         response = openai.ChatCompletion.create(
             model="gpt-4-vision-preview",
-           messages = [
+           messages = messages=[
     {
         "role": "system",
         "content": "あなたは優秀な広告デザイナーです。"
     },
     {
         "role": "user",
-        "content": [
-            {
-                "type": "text",
-"text": """以下の基準に従って、この広告バナーをプロの視点で辛口に採点してください：
+        "content": {
+            "type": "text",
+            "text": """以下の基準に従って、この広告バナーをプロの視点で辛口に採点してください：
 
 【評価基準】
 1. 何の広告かが一瞬で伝わるか（内容の明確さ）
@@ -73,13 +72,10 @@ if uploaded_file is not None:
 スコア：A / B / C のいずれかで採点してください
 （A：優れた広告 / B：改善の余地あり / C：問題が多い）
 
-改善コメント：端的に2〜3行で指摘（甘口NG、曖昧表現NG）
-"""
-
-            }
-        ]
+改善コメント：端的に2〜3行で指摘（甘口NG、曖昧表現NG）"""
+        }
     }
-]
+],
 
             max_tokens=500
         )
