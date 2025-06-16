@@ -46,12 +46,13 @@ with center:
     st.subheader("AIバナー採点")
 
     if st.button("🚀 計測する"):
-        # 🔽 ここを追加！前回の結果を消す
+    # 🔽 ここを追加！前回の結果を消す（←インデント必要！）
     st.session_state.result_data.clear()
 
     for label, file in zip(["A", "B"], [uploaded_a, uploaded_b]):
         if file:
-            # ...画像変換、GPT送信などの処理
+            # ...ここもインデントで揃える
+
                 image = Image.open(file)
                 buffer = io.BytesIO()
                 image.save(buffer, format="PNG")
