@@ -20,10 +20,19 @@ if uploaded_file is not None:
     st.subheader("🧠 AIの採点結果（仮）")
     st.write("📊 スコア：**A評価**")
     st.write("💬 コメント：`文字の視認性が良く、パッと目を引きます！`")
+import streamlit as st
+import os
 import openai
-from PIL import Image
 import base64
 import io
+from PIL import Image
+
+# 環境変数からAPIキーを取得
+openai.api_key = os.getenv("OPENAI_API_KEY")
+
+
+openai.api_key = os.getenv("OPENAI_API_KEY")
+
 
 # 画像アップロード
 uploaded_file = st.file_uploader("バナー画像をアップロード", type=["png", "jpg", "jpeg"])
