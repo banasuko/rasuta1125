@@ -13,11 +13,11 @@ client = OpenAI(api_key=openai_api_key)
 st.set_page_config(layout="wide")
 
 # ヘッダー：ロゴ＋タイトル
-with st.container():
+ st.container():
     col1, col2 = st.columns([1, 8])
-    with col1:
+     col1:
     st.image("Ai (1).png", width=80)  # ロゴ画像ファイル名に応じて変更可
-    with col2:
+     col2:
         st.markdown("### バナー広告ＡＢテストバナスコ")
 
 # サイドバー：モードリンク
