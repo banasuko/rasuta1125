@@ -50,7 +50,7 @@ if uploaded_file is not None:
     with st.spinner("AIが採点中です..."):
         response = openai.ChatCompletion.create(
             model="gpt-4-vision-preview",
-           messages = messages=[
+            messages=[
     {
         "role": "system",
         "content": "あなたは優秀な広告デザイナーです。"
