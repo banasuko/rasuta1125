@@ -75,27 +75,11 @@ if uploaded_file is not None:
 
 改善コメント：端的に2〜3行で指摘（甘口NG、曖昧表現NG）
 """
-            },
-            {
-                "type": "image_url",
-                "image_url": {
-                    "url": f"data:image/png;base64,{img_str}"
-                }
             }
         ]
     }
 ]
 
-
-            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str}"}}
-        ]
-    }
-]
-
-                        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str}"}}
-                    ],
-                },
-            ],
             max_tokens=500
         )
 
