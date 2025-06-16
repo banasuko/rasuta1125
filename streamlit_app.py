@@ -16,7 +16,7 @@ st.set_page_config(layout="wide")
 with st.container():
     col1, col2 = st.columns([1, 8])
     with col1:
-    st.image("Ai.png", width=80)  # ロゴ画像ファイル名に応じて変更可
+    st.image("Ai (1).png", width=80)  # ロゴ画像ファイル名に応じて変更可
     with col2:
         st.markdown("### バナー広告ＡＢテストバナスコ")
 
