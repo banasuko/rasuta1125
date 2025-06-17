@@ -4,6 +4,9 @@ import io
 from PIL import Image
 from openai import OpenAI
 import os
+import gspread
+from datetime import datetime
+from oauth2client.service_account import ServiceAccountCredentials
 
 # APIキーの取得
 openai_api_key = os.getenv("OPENAI_API_KEY")
@@ -12,24 +15,34 @@ client = OpenAI(api_key=openai_api_key)
 # ページ設定
 st.set_page_config(layout="wide", page_title="バナスコAI", page_icon="📊")
 
-# タブ構成（採点／提案）
+# Google Sheets 認証（事前にgspread用JSONを設定）
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+credentials = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
+gc = gspread.authorize(credentials)
+sheet_url = "https://docs.google.com/spreadsheets/d/1uUxZRY_ZHvwm1gMF_F936yRu0vbgtd6uGOHt-Ejgeao/edit"
+sheet = gc.open_by_url(sheet_url).sheet1
+
+# タブ構成
 tabs = st.tabs(["📊 バナー採点", "💡 コピー提案"])
 
 with tabs[0]:
-    # ロゴとタイトル
     st.image("ai_logo.png", width=80)
     st.markdown("## バナー広告ＡＢテストバナスコ")
 
-    # サイドバー：モード切替
-    st.sidebar.markdown("### 📂 モード切替")
-    mode = st.sidebar.selectbox("使用目的", ["Instagram広告", "Instagram投稿", "Google広告（GDN）", "Yahoo広告（YDN）"])
+    # 入力欄（共通情報）
+    st.sidebar.markdown("### ユーザー入力")
+    user_name = st.sidebar.text_input("あなたの名前")
+    product_name = st.sidebar.text_input("商品・サービス名")
+    target_audience = st.sidebar.text_input("ターゲット層（例：20代女性など）")
+    memo = st.sidebar.text_area("補足・備考（任意）")
+
+    st.sidebar.markdown("---")
+    mode = st.sidebar.selectbox("使用モード", ["Instagram広告", "Instagram投稿", "Google広告（GDN）", "Yahoo広告（YDN）"])
     tone = st.sidebar.selectbox("コメントトーン", ["プロ目線で辛口", "優しく丁寧に", "専門家としてシビアに"])
 
-    # セッション状態の初期化
     if "result_data" not in st.session_state:
         st.session_state.result_data = {}
 
-    # レイアウト：3列
     left, center, right = st.columns([3, 2, 3])
 
     with left:
@@ -72,7 +85,7 @@ with tabs[0]:
                                     "content": [
                                         {
                                             "type": "text",
-                                            "text": f"以下の基準に従って、この広告バナーをプロの視点で{tone}で採点してください：\n\n【評価基準】\n1. 何の広告かが一瞬で伝わるか（内容の明確さ）\n2. メインコピーの見やすさ（フォント・サイズ・色の使い方）\n3. 行動喚起があるか（予約・購入などにつながるか）\n4. 写真とテキストが噛み合っているか（世界観や目的にズレがないか）\n5. 情報量のバランス（不要な装飾・ごちゃごちゃしていないか）\n\n【出力フォーマット】\nスコア：A / B / C のいずれかで採点してください（A：優れた広告 / B：改善の余地あり / C：問題が多い）\n\n改善コメント：端的に2〜3行で具体的に指摘（甘口NG、曖昧表現NG）"
+                                            "text": f"以下のバナーを対象に、\n商品：{product_name}\nターゲット：{target_audience}\n補足：{memo}\n\n以下の基準に従って、プロの視点で{tone}で採点してください：\n\n【評価基準】\n1. 何の広告かが一瞬で伝わるか（内容の明確さ）\n2. メインコピーの見やすさ（フォント・サイズ・色の使い方）\n3. 行動喚起があるか（予約・購入などにつながるか）\n4. 写真とテキストが噛み合っているか（世界観や目的にズレがないか）\n5. 情報量のバランス（不要な装飾・ごちゃごちゃしていないか）\n\n【出力フォーマット】\nスコア：A / B / C のいずれかで採点してください\n改善コメント：2〜3行で具体的に（甘口NG）"
                                         },
                                         {
                                             "type": "image_url",
@@ -98,24 +111,16 @@ with tabs[0]:
                         "comment": comment
                     }
 
+            # 🔽 採点結果をスプレッドシートに保存
+            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            sheet.append_row([
+                now, user_name, product_name, target_audience, memo, mode,
+                st.session_state.result_data.get("A", {}).get("score", ""),
+                st.session_state.result_data.get("A", {}).get("comment", ""),
+                st.session_state.result_data.get("B", {}).get("score", ""),
+                st.session_state.result_data.get("B", {}).get("comment", "")
+            ])
+
     with right:
         st.markdown("<div style='border:2px dashed #ccc; height:300px; text-align:center; padding:20px;'>3つ目のバナー枠（今後追加予定）</div>", unsafe_allow_html=True)
-
-
-with tabs[1]:
-    st.subheader("💡 バナーコピー自動提案（β版）")
-    category = st.selectbox("ジャンルを選んでください", ["ホテル広告", "カフェ紹介", "習い事スクール", "物件紹介", "ECセール"])
-    tone2 = st.radio("トーン設定", ["親しみやすく", "専門的に", "インパクト重視"])
-    prompt = st.text_area("📝 補足情報（任意）", "例：沖縄の海沿いで家族向け。夏限定。")
-
-    if st.button("🪄 コピーを生成"):
-        with st.spinner("生成中..."):
-            response = client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {"role": "system", "content": "あなたは広告コピーライターです。"},
-                    {"role": "user", "content": f"ジャンル：{category}\nトーン：{tone2}\n補足情報：{prompt}\n\n上記に基づいて、SNS広告に使えるキャッチコピーを5つ提案してください。1行ずつ表示してください。"}
-                ],
-                max_tokens=500
-            )
-            st.markdown(response.choices[0].message.content)
+)
