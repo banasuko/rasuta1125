@@ -13,11 +13,11 @@ from pydrive2.drive import GoogleDrive
 openai_api_key = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=openai_api_key)
 
-# Web Apps Script のエンドポイント（あなたのものに差し替え）
+# Web Apps Script のエンドポイント
 GAS_URL = "https://script.google.com/macros/s/your-script-id/exec"
 
 # Google Drive アップロード用
-FOLDER_ID = "your_drive_folder_id"  # あなたのDriveフォルダIDに変更
+FOLDER_ID = "your_drive_folder_id"  # ご自身のDriveフォルダIDに変更
 
 def upload_image_to_drive_get_url(pil_image, filename):
     gauth = GoogleAuth()
@@ -52,7 +52,7 @@ st.title("🧠 バナー広告 採点AI - バナスコ")
 # 入力欄
 user_name = st.text_input("ユーザー名")
 platform = st.selectbox("媒体", ["Instagram", "GDN", "YDN"])
-category = st.selectbox("カテゴリ", ["広告", "投稿"])
+category = st.selectbox("カテゴリ", ["広告", "投稿"] if platform == "Instagram" else ["広告"])
 has_ad_budget = st.selectbox("広告予算", ["あり", "なし"])
 purpose = st.selectbox("目的", ["プロフィール誘導", "リンククリック", "保存数増加"])
 banner_name = st.text_input("バナー名（任意）")
@@ -104,8 +104,9 @@ if uploaded_file and st.button("🚀 採点＋保存"):
     image_url = upload_image_to_drive_get_url(image, uploaded_file.name)
 
     # Web Apps Script へ送信
+    sheet_name = f"{platform}_{category}用"
     data = {
-        "sheetName": f"{platform}_{category}用",
+        "sheetName": sheet_name,
         "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "platform": platform,
         "category": category,
