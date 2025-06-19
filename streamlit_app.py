@@ -6,123 +6,111 @@ import requests
 from PIL import Image
 from datetime import datetime
 from openai import OpenAI
-from pydrive2.auth import GoogleAuth
-from pydrive2.drive import GoogleDrive
 
 # --- 設定 ---
 openai_api_key = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=openai_api_key)
 
-# Web Apps Script のエンドポイント
-GAS_URL = "https://script.google.com/macros/s/your-script-id/exec"
-
-# Google Drive アップロード用
-FOLDER_ID = "your_drive_folder_id"  # ご自身のDriveフォルダIDに変更
-
-def upload_image_to_drive_get_url(pil_image, filename):
-    gauth = GoogleAuth()
-    gauth.LoadCredentialsFile("credentials.json")
-    if gauth.credentials is None:
-        gauth.LocalWebserverAuth()
-    elif gauth.access_token_expired:
-        gauth.Refresh()
-    else:
-        gauth.Authorize()
-    gauth.SaveCredentialsFile("credentials.json")
-    drive = GoogleDrive(gauth)
-
-    buf = io.BytesIO()
-    pil_image.save(buf, format="PNG")
-    buf.seek(0)
-
-    file_drive = drive.CreateFile({
-        'title': filename,
-        'mimeType': 'image/png',
-        'parents': [{'id': FOLDER_ID}]
-    })
-    file_drive.SetContentString(base64.b64encode(buf.read()).decode(), encoding='base64')
-    file_drive.Upload()
-    file_drive.InsertPermission({'type': 'anyone', 'role': 'reader'})
-    return f"https://drive.google.com/uc?export=view&id={file_drive['id']}"
+# Google Apps Script WebアプリのURL（変更してください）
+GAS_URL = "https://script.google.com/macros/s/XXXXXXXXXXXXXXXXXXXX/exec"
 
 # --- Streamlit UI ---
 st.set_page_config(layout="centered", page_title="バナスコAI")
 st.title("🧠 バナー広告 採点AI - バナスコ")
 
-# 入力欄
-user_name = st.text_input("ユーザー名")
-platform = st.selectbox("媒体", ["Instagram", "GDN", "YDN"])
-category = st.selectbox("カテゴリ", ["広告", "投稿"] if platform == "Instagram" else ["広告"])
-has_ad_budget = st.selectbox("広告予算", ["あり", "なし"])
-purpose = st.selectbox("目的", ["プロフィール誘導", "リンククリック", "保存数増加"])
-banner_name = st.text_input("バナー名（任意）")
-result = st.text_input("実績（任意）")
-follower_gain = st.text_input("フォロワー増加（任意）")
-memo = st.text_area("メモ（任意）")
+mode = st.radio("モード選択", ["単体バナーを採点", "A/Bバナーを比較"])
 
-# バナー画像
-uploaded_file = st.file_uploader("バナー画像をアップロード", type=["png", "jpg", "jpeg"])
-
-if uploaded_file and st.button("🚀 採点＋保存"):
-    image = Image.open(uploaded_file)
-    st.image(image, caption="アップロード画像", use_column_width=True)
-
-    # GPTに送信してスコアとコメントを取得
+def get_gpt_feedback(image_file):
+    image = Image.open(image_file)
     buf = io.BytesIO()
     image.save(buf, format="PNG")
     img_str = base64.b64encode(buf.getvalue()).decode()
 
-    with st.spinner("AIが採点中です..."):
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {"role": "system", "content": "あなたは広告のプロです。"},
-                {"role": "user", "content": [
-                    {"type": "text", "text":
-                        "以下の広告バナーをプロ視点で採点してください：\n"
-                        "【評価基準】\n"
-                        "1. 内容が一瞬で伝わるか\n"
-                        "2. コピーの見やすさ\n"
-                        "3. 行動喚起\n"
-                        "4. 写真とテキストの整合性\n"
-                        "5. 情報量のバランス\n"
-                        "【出力形式】\nスコア：A/B/C\n改善コメント：2～3行"
-                    },
-                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str}"}}
-                ]}
-            ],
-            max_tokens=600
-        )
-        content = response.choices[0].message.content
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": "あなたは広告のプロです。"},
+            {"role": "user", "content": [
+                {"type": "text", "text":
+                    "以下の広告バナーをプロ視点で採点してください：\n"
+                    "【評価基準】\n"
+                    "1. 内容が一瞬で伝わるか\n"
+                    "2. コピーの見やすさ\n"
+                    "3. 行動喚起\n"
+                    "4. 写真とテキストの整合性\n"
+                    "5. 情報量のバランス\n"
+                    "【出力形式】\nスコア：A/B/C\n改善コメント：2～3行\nコピー改善案：1案"
+                },
+                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str}"}}
+            ]}
+        ],
+        max_tokens=600
+    )
+    return response.choices[0].message.content
+
+def post_to_gsheet(data):
+    try:
+        response = requests.post(GAS_URL, json=data)
+        st.write("📡 GAS応答ステータスコード:", response.status_code)
+        st.write("📄 GAS応答本文:", response.text)
+        if response.status_code == 200:
+            st.success("📊 スプレッドシートに記録しました！")
+        else:
+            st.error("❌ スプレッドシート送信エラー")
+    except Exception as e:
+        st.error(f"送信時にエラーが発生しました: {e}")
+
+if mode == "単体バナーを採点":
+    uploaded_file = st.file_uploader("バナー画像をアップロード", type=["png", "jpg", "jpeg"])
+    if uploaded_file and st.button("🚀 採点する（1枚）"):
+        content = get_gpt_feedback(uploaded_file)
+        st.success("✅ 採点結果")
+        st.markdown(content)
+
         score = next((l.replace("スコア：", "").strip() for l in content.splitlines() if "スコア" in l), "")
         comment = next((l.replace("改善コメント：", "").strip() for l in content.splitlines() if "改善コメント" in l), "")
+        copyidea = next((l.replace("コピー改善案：", "").strip() for l in content.splitlines() if "コピー改善案" in l), "")
 
-    st.success(f"スコア：{score}")
-    st.markdown(f"**改善コメント：** {comment}")
+        # GAS送信
+        data = {
+            "sheetName": "バナスコ_単体",
+            "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "score": score,
+            "comment": comment,
+            "copyidea": copyidea
+        }
+        post_to_gsheet(data)
 
-    # Google Driveへ画像アップ → URL取得
-    image_url = upload_image_to_drive_get_url(image, uploaded_file.name)
+elif mode == "A/Bバナーを比較":
+    uploaded_a = st.file_uploader("バナーA", type=["png", "jpg", "jpeg"], key="a")
+    uploaded_b = st.file_uploader("バナーB", type=["png", "jpg", "jpeg"], key="b")
+    if uploaded_a and uploaded_b and st.button("🚀 採点する（A/Bバナー）"):
+        content_a = get_gpt_feedback(uploaded_a)
+        content_b = get_gpt_feedback(uploaded_b)
 
-    # Web Apps Script へ送信
-    sheet_name = f"{platform}_{category}用"
-    data = {
-        "sheetName": sheet_name,
-        "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "platform": platform,
-        "category": category,
-        "hasAdBudget": has_ad_budget,
-        "purpose": purpose,
-        "bannerName": banner_name,
-        "score": score,
-        "comment": comment,
-        "result": result,
-        "followerGain": follower_gain,
-        "memo": memo,
-        "imageUrl": image_url
-    }
+        st.success("✅ バナーAの評価")
+        st.markdown(content_a)
+        st.success("✅ バナーBの評価")
+        st.markdown(content_b)
 
-    response = requests.post(GAS_URL, json=data)
-    if response.status_code == 200:
-        st.success("📊 スプレッドシートに記録しました！")
-    else:
-        st.error("スプレッドシート送信時にエラーが発生しました。")
+        # スコア・コメント抽出
+        score_a = next((l.replace("スコア：", "").strip() for l in content_a.splitlines() if "スコア" in l), "")
+        comment_a = next((l.replace("改善コメント：", "").strip() for l in content_a.splitlines() if "改善コメント" in l), "")
+        copy_a = next((l.replace("コピー改善案：", "").strip() for l in content_a.splitlines() if "コピー改善案" in l), "")
+
+        score_b = next((l.replace("スコア：", "").strip() for l in content_b.splitlines() if "スコア" in l), "")
+        comment_b = next((l.replace("改善コメント：", "").strip() for l in content_b.splitlines() if "改善コメント" in l), "")
+        copy_b = next((l.replace("コピー改善案：", "").strip() for l in content_b.splitlines() if "コピー改善案" in l), "")
+
+        data = {
+            "sheetName": "バナスコ_AB比較",
+            "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "score_a": score_a,
+            "comment_a": comment_a,
+            "copy_a": copy_a,
+            "score_b": score_b,
+            "comment_b": comment_b,
+            "copy_b": copy_b
+        }
+        post_to_gsheet(data)
+
