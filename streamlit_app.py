@@ -125,3 +125,24 @@ if copy_input and st.button("💡 コピーを提案してもらう"):
             max_tokens=300
         )
         st.markdown(copy_res.choices[0].message.content)
+        if uploaded_file and st.button("🚀 採点＋保存"):
+    # 🔽 採点・画像処理コード（略）
+
+    # 🔽 スプレッドシート送信用のデータ辞書を組む
+    data = {
+        "sheetName": sheet_name,
+        "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        ...
+    }
+
+    # 🔽 ここで POST 実行！
+    response = requests.post(GAS_URL, json=data)
+
+    st.write("📡 GAS応答ステータスコード:", response.status_code)
+    st.write("📄 GAS応答本文:", response.text)
+
+    if response.status_code == 200:
+        st.success("📊 スプレッドシートに記録しました！")
+    else:
+        st.error("❌ スプレッドシート送信エラー")
+
