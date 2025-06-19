@@ -1,3 +1,4 @@
+
 import streamlit as st
 import base64
 import io
@@ -12,7 +13,7 @@ openai_api_key = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=openai_api_key)
 
 # Web Apps Script のエンドポイント
-GAS_URL = "https://script.google.com/macros/s/AKfycbxtXdRDYmtuzqGuDFYAehC6KP3dcoEz36i1PuUgzMBseqE0cuYcJHoaZ-s7Tmt-Zw1a/exec"
+GAS_URL = "https://script.google.com/macros/s/AKfycbxjiaQDKTARUWGrDjsDv1WdIYOw3nRu0lo5y1-mcl91Q1aRjyYoENOYBRJNwe5AvH0p/exec"
 
 # --- UI構成（3カラム） ---
 st.set_page_config(layout="wide", page_title="バナスコAI")
@@ -23,7 +24,6 @@ left, center, right = st.columns([1.2, 2.5, 1.2])
 with left:
     st.subheader("📥 アップロード")
     uploaded_file = st.file_uploader("バナー画像をアップロード", type=["png", "jpg", "jpeg"])
-
     if uploaded_file:
         st.image(uploaded_file, caption="アップロード画像", use_container_width=True)
 
