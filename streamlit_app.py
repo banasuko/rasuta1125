@@ -126,8 +126,6 @@ if copy_input and st.button("💡 コピーを提案してもらう"):
         )
         st.markdown(copy_res.choices[0].message.content)
 
-        }
-
         response = requests.post(GAS_URL, json=data)
         st.write("📡 GAS応答ステータスコード:", response.status_code)
         st.write("📄 GAS応答本文:", response.text)
