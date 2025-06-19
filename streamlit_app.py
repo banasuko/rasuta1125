@@ -10,7 +10,7 @@ from openai import OpenAI
 # --- 設定 ---
 openai_api_key = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=openai_api_key)
-GAS_URL = "https://script.google.com/macros/s/XXXXXXXXXXXXXXXXXXXX/exec"  # Web Apps Script のURLに置換
+GAS_URL = "https://script.google.com/macros/s/AKfycbxtXdRDYmtuzqGuDFYAehC6KP3dcoEz36i1PuUgzMBseqE0cuYcJHoaZ-s7Tmt-Zw1a/exec"  # Web Apps Script のURLに置換
 
 # --- ヘッダー・サイドバー ---
 st.set_page_config(page_title="バナー広告A/Bテスト バナスコ", layout="wide")
