@@ -1,98 +1,130 @@
-　import streamlit as st
+import streamlit as st
 import base64
 import io
 import os
-from dotenv import load_dotenv
-load_dotenv()
+from dotenv import load_dotenv      
 import requests
 from PIL import Image
 from datetime import datetime
 from openai import OpenAI
+from pydrive2.auth import GoogleAuth
+from pydrive2.drive import GoogleDrive
 
 # --- 設定 ---
-openai_api_key = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=openai_api_key)
+GAS_URL = "AKfycbxjiaQDKTARUWGrDjsDv1WdIYOw3nRu0lo5y1-mcl91Q1aRjyYoENOYBRJNwe5AvH0p"  # あなたのApps Script URL
+FOLDER_ID = "YOUR_GOOGLE_DRIVE_FOLDER_ID"  # 画像保存先のフォルダID
 
-# --- UI構成 ---
+# --- Google Drive アップロード関数 ---
+def upload_image_to_drive_get_url(pil_image, filename):
+    gauth = GoogleAuth()
+    gauth.LoadCredentialsFile("credentials.json")
+    if gauth.credentials is None:
+        gauth.LocalWebserverAuth()
+    elif gauth.access_token_expired:
+        gauth.Refresh()
+    else:
+        gauth.Authorize()
+    gauth.SaveCredentialsFile("credentials.json")
+    drive = GoogleDrive(gauth)
+
+    buf = io.BytesIO()
+    pil_image.save(buf, format="PNG")
+    buf.seek(0)
+
+    file_drive = drive.CreateFile({
+        'title': filename,
+        'mimeType': 'image/png',
+        'parents': [{'id': FOLDER_ID}]
+    })
+    file_drive.SetContentString(base64.b64encode(buf.read()).decode(), encoding='base64')
+    file_drive.Upload()
+    file_drive.InsertPermission({'type': 'anyone', 'role': 'reader'})
+    return f"https://drive.google.com/uc?export=view&id={file_drive['id']}"
+
+# --- UI ---
 st.set_page_config(layout="centered", page_title="バナスコAI")
 st.title("🧠 バナー広告 採点AI - バナスコ")
 
-st.markdown("### 🎯 基本情報入力")
-col1, col2 = st.columns(2)
-with col1:
-    user_name = st.text_input("ユーザー名")
-    platform = st.selectbox("媒体", ["Instagram", "GDN", "YDN"])
-    category = st.selectbox("カテゴリ", ["広告", "投稿"] if platform == "Instagram" else ["広告"])
-    purpose = st.selectbox("目的", ["プロフィール誘導", "リンククリック", "保存数増加"])
-with col2:
-    banner_name = st.text_input("バナー名（任意）")
-    result = st.text_input("実績（任意）")
-    follower_gain = st.text_input("フォロワー増加（任意）")
-    memo = st.text_area("メモ（任意）")
+user_name = st.text_input("ユーザー名")
+platform = st.selectbox("媒体", ["Instagram", "GDN", "YDN"])
+category = st.selectbox("カテゴリ", ["広告", "投稿"] if platform == "Instagram" else ["広告"])
+has_ad_budget = st.selectbox("広告予算", ["あり", "なし"])
+purpose = st.selectbox("目的", ["プロフィール誘導", "リンククリック", "保存数増加"])
+banner_name = st.text_input("バナー名（任意）")
+result = st.text_input("実績（任意）")
+follower_gain = st.text_input("フォロワー増加（任意）")
+memo = st.text_area("メモ（任意）")
+uploaded_file = st.file_uploader("バナー画像をアップロード", type=["png", "jpg", "jpeg"])
 
-st.markdown("---")
-st.markdown("### 🖼️ 採点したいバナーをアップロードしてください")
-uploaded_file = st.file_uploader("画像ファイル", type=["png", "jpg", "jpeg"])
+# --- メイン処理 ---
+if uploaded_file and st.button("🚀 採点＋保存"):
+    image = Image.open(uploaded_file)
+    st.image(image, caption="アップロード画像", use_column_width=True)
 
-is_ab_test = st.checkbox("ABテストを行う（2枚アップロード）")
-
-uploaded_file_b = None
-if is_ab_test:
-    uploaded_file_b = st.file_uploader("比較用画像（B案）", type=["png", "jpg", "jpeg"], key="b")
-
-# --- 採点関数 ---
-def score_banner(image_file):
-    image = Image.open(image_file)
+    # GPTに送信して採点
     buf = io.BytesIO()
     image.save(buf, format="PNG")
     img_str = base64.b64encode(buf.getvalue()).decode()
 
-    response = client.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": "あなたは優秀な広告マーケターです。"},
-            {"role": "user", "content": [
-                {"type": "text", "text":
-                    "以下のバナー画像を広告のプロ視点で採点してください：
-"
-                    "【評価基準】
-"
-                    "1. 内容が一瞬で伝わるか
-"
-                    "2. コピーの見やすさ
-"
-                    "3. 行動喚起があるか
-"
-                    "4. 写真と文字の整合性
-"
-                    "5. 情報量のバランス
-"
-                    "【出力形式】
-スコア：A/B/C
-改善コメント：2〜3行程度"
-                },
-                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str}"}}
-            ]}
-        ],
-        max_tokens=700
-    )
+    with st.spinner("AIが採点中です..."):
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "あなたは広告のプロです。"},
+                {"role": "user", "content": [
+                    {"type": "text", "text":
+                        "以下の広告バナーをプロ視点で採点してください：\n"
+                        "【評価基準】\n"
+                        "1. 内容が一瞬で伝わるか\n"
+                        "2. コピーの見やすさ\n"
+                        "3. 行動喚起\n"
+                        "4. 写真とテキストの整合性\n"
+                        "5. 情報量のバランス\n"
+                        "【出力形式】\nスコア：A/B/C\n改善コメント：2～3行"
+                    },
+                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str}"}}
+                ]}
+            ],
+            max_tokens=600
+        )
+        content = response.choices[0].message.content
+        score = next((l.replace("スコア：", "").strip() for l in content.splitlines() if "スコア" in l), "")
+        comment = next((l.replace("改善コメント：", "").strip() for l in content.splitlines() if "改善コメント" in l), "")
 
-    content = response.choices[0].message.content
-    score = next((l.replace("スコア：", "").strip() for l in content.splitlines() if "スコア" in l), "")
-    comment = next((l.replace("改善コメント：", "").strip() for l in content.splitlines() if "改善コメント" in l), "")
-    return score, comment, image
+    st.success(f"スコア：{score}")
+    st.markdown(f"**改善コメント：** {comment}")
 
-# --- 実行ボタン ---
-if uploaded_file and st.button("🚀 採点開始"):
-    st.markdown("### ✅ 採点結果")
+    # Driveに画像アップロード → URL取得
+    image_url = upload_image_to_drive_get_url(image, uploaded_file.name)
 
-    score_a, comment_a, image_a = score_banner(uploaded_file)
-    st.image(image_a, caption=f"A案（スコア：{score_a}）", use_column_width=True)
-    st.markdown(f"**改善コメント：** {comment_a}")
+    # GAS送信データ構築
+    sheet_name = f"{platform}_{category}用"
+    data = {
+    "sheet_name": sheet_name,
+    "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    "platform": platform,
+    "category": category,
+    "has_ad_budget": has_ad_budget,
+    "purpose": purpose,
+    "banner_name": banner_name,
+    "score": score,
+    "comment": comment,
+    "result": result,
+    "follower_gain": follower_gain,
+    "memo": memo,
+    "image_url": image_url
+}
 
-    if is_ab_test and uploaded_file_b:
-        score_b, comment_b, image_b = score_banner(uploaded_file_b)
-        st.image(image_b, caption=f"B案（スコア：{score_b}）", use_column_width=True)
-        st.markdown(f"**改善コメント（B案）：** {comment_b}")
-    elif is_ab_test:
-        st.warning("⚠️ B案画像が未アップロードです")
+
+    # POST送信
+    response = requests.post(GAS_URL, json=data)
+
+    # 結果ログ
+    st.write("📡 GAS応答ステータスコード:", response.status_code)
+    st.write("📄 GAS応答本文:", response.text)
+
+    if response.status_code == 200:
+        st.success("📊 スプレッドシートに記録しました！")
+    else:
+        st.error("❌ スプレッドシート送信エラー")
