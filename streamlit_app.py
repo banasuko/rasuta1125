@@ -1,66 +1,23 @@
 import streamlit as st
 import base64
 import io
-import requests
 from PIL import Image
-from datetime import datetime
 from openai import OpenAI
-from pydrive2.auth import GoogleAuth
-from pydrive2.drive import GoogleDrive
 
-# --- 設定 ---
-client = OpenAI(api_key="sk-ここにあなたのキーをそのまま貼る")
-GAS_URL = "AKfycbxjiaQDKTARUWGrDjsDv1WdIYOw3nRu0lo5y1-mcl91Q1aRjyYoENOYBRJNwe5AvH0p"  # あなたのApps Script URL
-FOLDER_ID = "YOUR_GOOGLE_DRIVE_FOLDER_ID"  # 画像保存先のフォルダID
+# 🔑 OpenAI APIキーを直接記述（セキュリティ上、後で .env に戻すのが理想）
+client = OpenAI(api_key="sk-ここにあなたのキーを記述")
 
-# --- Google Drive アップロード関数 ---
-def upload_image_to_drive_get_url(pil_image, filename):
-    gauth = GoogleAuth()
-    gauth.LoadCredentialsFile("credentials.json")
-    if gauth.credentials is None:
-        gauth.LocalWebserverAuth()
-    elif gauth.access_token_expired:
-        gauth.Refresh()
-    else:
-        gauth.Authorize()
-    gauth.SaveCredentialsFile("credentials.json")
-    drive = GoogleDrive(gauth)
-
-    buf = io.BytesIO()
-    pil_image.save(buf, format="PNG")
-    buf.seek(0)
-
-    file_drive = drive.CreateFile({
-        'title': filename,
-        'mimeType': 'image/png',
-        'parents': [{'id': FOLDER_ID}]
-    })
-    file_drive.SetContentString(base64.b64encode(buf.read()).decode(), encoding='base64')
-    file_drive.Upload()
-    file_drive.InsertPermission({'type': 'anyone', 'role': 'reader'})
-    return f"https://drive.google.com/uc?export=view&id={file_drive['id']}"
-
-# --- UI ---
+# --- Streamlit UI ---
 st.set_page_config(layout="centered", page_title="バナスコAI")
 st.title("🧠 バナー広告 採点AI - バナスコ")
 
-user_name = st.text_input("ユーザー名")
-platform = st.selectbox("媒体", ["Instagram", "GDN", "YDN"])
-category = st.selectbox("カテゴリ", ["広告", "投稿"] if platform == "Instagram" else ["広告"])
-has_ad_budget = st.selectbox("広告予算", ["あり", "なし"])
-purpose = st.selectbox("目的", ["プロフィール誘導", "リンククリック", "保存数増加"])
-banner_name = st.text_input("バナー名（任意）")
-result = st.text_input("実績（任意）")
-follower_gain = st.text_input("フォロワー増加（任意）")
-memo = st.text_area("メモ（任意）")
 uploaded_file = st.file_uploader("バナー画像をアップロード", type=["png", "jpg", "jpeg"])
 
-# --- メイン処理 ---
-if uploaded_file and st.button("🚀 採点＋保存"):
+if uploaded_file and st.button("🚀 採点開始"):
     image = Image.open(uploaded_file)
     st.image(image, caption="アップロード画像", use_column_width=True)
 
-    # GPTに送信して採点
+    # 画像をbase64に変換
     buf = io.BytesIO()
     image.save(buf, format="PNG")
     img_str = base64.b64encode(buf.getvalue()).decode()
@@ -87,42 +44,9 @@ if uploaded_file and st.button("🚀 採点＋保存"):
             max_tokens=600
         )
         content = response.choices[0].message.content
+
         score = next((l.replace("スコア：", "").strip() for l in content.splitlines() if "スコア" in l), "")
         comment = next((l.replace("改善コメント：", "").strip() for l in content.splitlines() if "改善コメント" in l), "")
 
     st.success(f"スコア：{score}")
     st.markdown(f"**改善コメント：** {comment}")
-
-    # Driveに画像アップロード → URL取得
-    image_url = upload_image_to_drive_get_url(image, uploaded_file.name)
-
-    # GAS送信データ構築
-    sheet_name = f"{platform}_{category}用"
-    data = {
-    "sheet_name": sheet_name,
-    "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-    "platform": platform,
-    "category": category,
-    "has_ad_budget": has_ad_budget,
-    "purpose": purpose,
-    "banner_name": banner_name,
-    "score": score,
-    "comment": comment,
-    "result": result,
-    "follower_gain": follower_gain,
-    "memo": memo,
-    "image_url": image_url
-}
-
-
-    # POST送信
-    response = requests.post(GAS_URL, json=data)
-
-    # 結果ログ
-    st.write("📡 GAS応答ステータスコード:", response.status_code)
-    st.write("📄 GAS応答本文:", response.text)
-
-    if response.status_code == 200:
-        st.success("📊 スプレッドシートに記録しました！")
-    else:
-        st.error("❌ スプレッドシート送信エラー")
