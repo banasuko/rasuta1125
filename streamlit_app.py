@@ -2,19 +2,24 @@ import streamlit as st
 import base64
 import io
 import os
+from dotenv import load_dotenv
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
+print("✅ 読み込んだAPIキー：", os.getenv("OPENAI_API_KEY"))         
+import requests
 from PIL import Image
 from datetime import datetime
 from openai import OpenAI
 from pydrive2.auth import GoogleAuth
 from pydrive2.drive import GoogleDrive
 
-# --- 直接キー記述（※本番では .env 推奨） ---
-openai_api_key = "YOUR_OPENAI_API_KEY"  # ← ここに直接APIキーを入力
-FOLDER_ID = "YOUR_GOOGLE_DRIVE_FOLDER_ID"  # ← GoogleDriveのフォルダIDを入力
-
+# --- 設定 ---
+openai_api_key = os.getenv("OPENAI_API_KEY")
+print("🔑 読み込まれたAPIキー：", openai_api_key) 
 client = OpenAI(api_key=openai_api_key)
+GAS_URL = "AKfycbxjiaQDKTARUWGrDjsDv1WdIYOw3nRu0lo5y1-mcl91Q1aRjyYoENOYBRJNwe5AvH0p"  # あなたのApps Script URL
+FOLDER_ID = "YOUR_GOOGLE_DRIVE_FOLDER_ID"  # 画像保存先のフォルダID
 
-# --- Driveアップロード関数 ---
+# --- Google Drive アップロード関数 ---
 def upload_image_to_drive_get_url(pil_image, filename):
     gauth = GoogleAuth()
     gauth.LoadCredentialsFile("credentials.json")
@@ -56,11 +61,12 @@ follower_gain = st.text_input("フォロワー増加（任意）")
 memo = st.text_area("メモ（任意）")
 uploaded_file = st.file_uploader("バナー画像をアップロード", type=["png", "jpg", "jpeg"])
 
-# --- 採点処理 ---
+# --- メイン処理 ---
 if uploaded_file and st.button("🚀 採点＋保存"):
     image = Image.open(uploaded_file)
     st.image(image, caption="アップロード画像", use_column_width=True)
 
+    # GPTに送信して採点
     buf = io.BytesIO()
     image.save(buf, format="PNG")
     img_str = base64.b64encode(buf.getvalue()).decode()
@@ -93,5 +99,36 @@ if uploaded_file and st.button("🚀 採点＋保存"):
     st.success(f"スコア：{score}")
     st.markdown(f"**改善コメント：** {comment}")
 
+    # Driveに画像アップロード → URL取得
     image_url = upload_image_to_drive_get_url(image, uploaded_file.name)
-    st.info(f"🔗 画像URL（Google Drive）: [リンクを開く]({image_url})")
+
+    # GAS送信データ構築
+    sheet_name = f"{platform}_{category}用"
+    data = {
+    "sheet_name": sheet_name,
+    "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    "platform": platform,
+    "category": category,
+    "has_ad_budget": has_ad_budget,
+    "purpose": purpose,
+    "banner_name": banner_name,
+    "score": score,
+    "comment": comment,
+    "result": result,
+    "follower_gain": follower_gain,
+    "memo": memo,
+    "image_url": image_url
+}
+
+
+    # POST送信
+    response = requests.post(GAS_URL, json=data)
+
+    # 結果ログ
+    st.write("📡 GAS応答ステータスコード:", response.status_code)
+    st.write("📄 GAS応答本文:", response.text)
+
+    if response.status_code == 200:
+        st.success("📊 スプレッドシートに記録しました！")
+    else:
+        st.error("❌ スプレッドシート送信エラー")
