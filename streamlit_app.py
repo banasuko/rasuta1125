@@ -4,6 +4,7 @@ import io
 import os
 from dotenv import load_dotenv
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
+print("✅ 読み込んだAPIキー：", os.getenv("OPENAI_API_KEY"))         
 import requests
 from PIL import Image
 from datetime import datetime
@@ -13,13 +14,10 @@ from pydrive2.drive import GoogleDrive
 
 # --- 設定 ---
 openai_api_key = os.getenv("OPENAI_API_KEY")
-if not openai_api_key:
-    st.error("❌ OpenAI APIキーが読み込めませんでした。`.env` を確認してください。")
-    st.stop()
-
+print("🔑 読み込まれたAPIキー：", openai_api_key) 
 client = OpenAI(api_key=openai_api_key)
-GAS_URL = "https://script.google.com/macros/s/AKfycbxjiaQDKTARUWGrDjsDv1WdIYOw3nRu0lo5y1-mcl91Q1aRjyYoENOYBRJNwe5AvH0p/exec"
-FOLDER_ID = "1oRyCu2sU9idRrj5tq5foQXp3ArtCW7rP"  # ←後で差し替えてください
+GAS_URL = "AKfycbxjiaQDKTARUWGrDjsDv1WdIYOw3nRu0lo5y1-mcl91Q1aRjyYoENOYBRJNwe5AvH0p"  # あなたのApps Script URL
+FOLDER_ID = "YOUR_GOOGLE_DRIVE_FOLDER_ID"  # 画像保存先のフォルダID
 
 # --- Google Drive アップロード関数 ---
 def upload_image_to_drive_get_url(pil_image, filename):
@@ -68,6 +66,7 @@ if uploaded_file and st.button("🚀 採点＋保存"):
     image = Image.open(uploaded_file)
     st.image(image, caption="アップロード画像", use_column_width=True)
 
+    # GPTに送信して採点
     buf = io.BytesIO()
     image.save(buf, format="PNG")
     img_str = base64.b64encode(buf.getvalue()).decode()
@@ -100,26 +99,32 @@ if uploaded_file and st.button("🚀 採点＋保存"):
     st.success(f"スコア：{score}")
     st.markdown(f"**改善コメント：** {comment}")
 
+    # Driveに画像アップロード → URL取得
     image_url = upload_image_to_drive_get_url(image, uploaded_file.name)
 
+    # GAS送信データ構築
     sheet_name = f"{platform}_{category}用"
     data = {
-        "sheet_name": sheet_name,
-        "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "platform": platform,
-        "category": category,
-        "has_ad_budget": has_ad_budget,
-        "purpose": purpose,
-        "banner_name": banner_name,
-        "score": score,
-        "comment": comment,
-        "result": result,
-        "follower_gain": follower_gain,
-        "memo": memo,
-        "image_url": image_url
-    }
+    "sheet_name": sheet_name,
+    "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    "platform": platform,
+    "category": category,
+    "has_ad_budget": has_ad_budget,
+    "purpose": purpose,
+    "banner_name": banner_name,
+    "score": score,
+    "comment": comment,
+    "result": result,
+    "follower_gain": follower_gain,
+    "memo": memo,
+    "image_url": image_url
+}
 
+
+    # POST送信
     response = requests.post(GAS_URL, json=data)
+
+    # 結果ログ
     st.write("📡 GAS応答ステータスコード:", response.status_code)
     st.write("📄 GAS応答本文:", response.text)
 
