@@ -19,7 +19,7 @@ if not openai_api_key:
 
 client = OpenAI(api_key=openai_api_key)
 GAS_URL = "https://script.google.com/macros/s/AKfycbxjiaQDKTARUWGrDjsDv1WdIYOw3nRu0lo5y1-mcl91Q1aRjyYoENOYBRJNwe5AvH0p/exec"
-FOLDER_ID = "YOUR_GOOGLE_DRIVE_FOLDER_ID"  # ←後で差し替えてください
+FOLDER_ID = "1oRyCu2sU9idRrj5tq5foQXp3ArtCW7rP"  # ←後で差し替えてください
 
 # --- Google Drive アップロード関数 ---
 def upload_image_to_drive_get_url(pil_image, filename):
