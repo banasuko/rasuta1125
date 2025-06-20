@@ -2,7 +2,6 @@ import streamlit as st
 import base64
 import io
 import os
-from dotenv import load_dotenv
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
 print("✅ 読み込んだAPIキー：", os.getenv("OPENAI_API_KEY"))         
 import requests
