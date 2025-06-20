@@ -2,10 +2,11 @@ import streamlit as st
 import base64
 import io
 import os
-from dotenv import load_dotenv      
+from dotenv import load_dotenv
 import requests
 from PIL import Image
 from datetime import datetime
+
 from openai import OpenAI
 from pydrive2.auth import GoogleAuth
 from pydrive2.drive import GoogleDrive
