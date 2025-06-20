@@ -1,30 +1,32 @@
 import streamlit as st
-from datetime import datetime
+import pandas as pd
 
-st.set_page_config(page_title="実績記録", layout="centered")
-st.title("📈 広告実績記録ページ")
+st.set_page_config(page_title="実績記録", layout="wide")
+st.title("📋 バナスコ｜広告実績記録ページ")
 
-st.markdown("このページでは、広告の成果を記録し、分析の材料として保存できます。")
+# データ取得（例：Google Sheets or 仮データ）
+# 仮データで構築
+if "records" not in st.session_state:
+    st.session_state["records"] = [
+        {
+            "campaign": "キャンペーンA",
+            "banner_name": "バナーA",
+            "platform": "Instagram",
+            "category": "広告",
+            "score": "A",
+            "ad_cost": "",
+            "impressions": "",
+            "clicks": "",
+            "followers": "",
+            "notes": ""
+        }
+    ]
 
-# 入力フォーム
-with st.form("record_form"):
-    col1, col2 = st.columns(2)
-    with col1:
-        campaign = st.text_input("キャンペーン名")
-        banner_name = st.text_input("バナー名（任意）")
-        platform = st.selectbox("メディア", ["Instagram", "GDN", "YDN"])
-        category = st.selectbox("カテゴリ", ["広告", "投稿"])
-        score = st.selectbox("スコア", ["A", "B", "C"])
-    with col2:
-        date = st.date_input("掲載日", value=datetime.today())
-        ad_cost = st.text_input("広告費（円）")
-        impressions = st.text_input("インプレッション数")
-        clicks = st.text_input("クリック数")
-        followers = st.text_input("フォロワー増加数")
+# 表として編集できるように
+df = pd.DataFrame(st.session_state["records"])
+edited_df = st.data_editor(df, num_rows="dynamic")
 
-    notes = st.text_area("メモ・気づきなど", height=100)
-    submit = st.form_submit_button("📌 データを保存（仮）")
-
-# 🔽 submit が押されたときの処理はここに書く！
-if submit:
-    st.success("✅ データを保存しました！（仮）")
+# 上書き保存ボタン（仮実装）
+if st.button("💾 編集内容を保存"):
+    st.session_state["records"] = edited_df.to_dict(orient="records")
+    st.success("保存しました（仮）")
