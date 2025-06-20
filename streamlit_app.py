@@ -1,10 +1,6 @@
 import streamlit as st
 import base64
 import io
-import os
-from dotenv import load_dotenv
-load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
-print("✅ 読み込んだAPIキー：", os.getenv("OPENAI_API_KEY"))         
 import requests
 from PIL import Image
 from datetime import datetime
@@ -13,9 +9,7 @@ from pydrive2.auth import GoogleAuth
 from pydrive2.drive import GoogleDrive
 
 # --- 設定 ---
-openai_api_key = os.getenv("OPENAI_API_KEY")
-print("🔑 読み込まれたAPIキー：", openai_api_key) 
-client = OpenAI(api_key=openai_api_key)
+client = OpenAI(api_key="sk-ここにあなたのキーをそのまま貼る")
 GAS_URL = "AKfycbxjiaQDKTARUWGrDjsDv1WdIYOw3nRu0lo5y1-mcl91Q1aRjyYoENOYBRJNwe5AvH0p"  # あなたのApps Script URL
 FOLDER_ID = "YOUR_GOOGLE_DRIVE_FOLDER_ID"  # 画像保存先のフォルダID
 
