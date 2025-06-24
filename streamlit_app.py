@@ -115,9 +115,8 @@ with col1:
 
                     image_url = upload_image_to_drive_get_url(image, uploaded_file.name)
 
-                    # GAS送信用データ構築（英語キー）
-                    data = {
-    "sheet_name": "record_log",  # ← ここ！
+                  data = {
+    "sheet_name": "record_log",
     "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     "platform": platform,
     "category": category,
@@ -129,11 +128,14 @@ with col1:
     "memo": memo,
     "image_url": image_url
 }
-    st.write("🖋 送信データ:", data)
 
-    response = requests.post(GAS_URL, json=data)
-    st.write("📡 GAS応答ステータスコード:", response.status_code)
-    st.write("📄 GAS応答本文:", response.text)
+# ここで表示
+st.write("🖋 送信データ:", data)
+
+response = requests.post(GAS_URL, json=data)
+st.write("📡 GAS応答ステータスコード:", response.status_code)
+st.write("📄 GAS応答本文:", response.text)
+
 
     if response.status_code == 200:
         st.success("📊 スプレッドシートに記録しました！")
