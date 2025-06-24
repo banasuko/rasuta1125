@@ -6,13 +6,14 @@ import requests
 from PIL import Image
 from datetime import datetime
 from openai import OpenAI
+from pydrive2.auth import GoogleAuth
+from pydrive2.drive import GoogleDrive
 
-image_url = "https://example.com/dummy-image.png"
 # --- 設定 ---
 openai_api_key = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=openai_api_key)
-GAS_URL = "AKfycbxjiaQDKTARUWGrDjsDv1WdIYOw3nRu0lo5y1-mcl91Q1aRjyYoENOYBRJNwe5AvH0p"  # あなたのApps Script URL
-FOLDER_ID = "YOUR_GOOGLE_DRIVE_FOLDER_ID"  # 画像保存先のフォルダID
+GAS_URL = "https://script.google.com/macros/s/AKfycbxjiaQDKTARUWGrDjsDv1WdIYOw3nRu0lo5y1-mcl91Q1aRjyYoENOYBRJNwe5AvH0p/exec"
+FOLDER_ID = "1oRyCu2sU9idRrj5tq5foQXp3ArtCW7rP"  # ← ご自身のフォルダIDに変更してください
 
 # --- Google Drive アップロード関数 ---
 def upload_image_to_drive_get_url(pil_image, filename):
@@ -94,11 +95,10 @@ if uploaded_file and st.button("🚀 採点＋保存"):
     st.success(f"スコア：{score}")
     st.markdown(f"**改善コメント：** {comment}")
 
-    # Driveに画像アップロード → URL取得
-    # Driveアップロードは使わず、仮のURLを使用
-　　image_url = "https://example.com/dummy-image.png"
+    # Driveにアップロード → URL取得
+    image_url = upload_image_to_drive_get_url(image, uploaded_file.name)
 
-    # GAS送信データ構築（記録用スプシに対応）
+    # GAS送信データ構築
     data = {
         "用途種別": category,
         "提案日": datetime.today().strftime("%Y-%m-%d"),
@@ -121,12 +121,10 @@ if uploaded_file and st.button("🚀 採点＋保存"):
     # POST送信
     response = requests.post(GAS_URL, json=data)
 
-    # 結果ログ
-    st.write("\ud83d\udce1 GAS応答ステータスコード:", response.status_code)
-    st.write("\ud83d\udcc4 GAS応答本文:", response.text)
+    st.write("📡 GAS応答ステータスコード:", response.status_code)
+    st.write("📄 GAS応答本文:", response.text)
 
     if response.status_code == 200:
-        st.success("\ud83d\udcca スプレッドシートに記録しました！")
+        st.success("📈 スプレッドシートに記録しました！")
     else:
-        st.error("\u274c スプレッドシート送信エラー")
-
+        st.error("❌ スプレッドシート送信エラー")
