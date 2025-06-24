@@ -100,7 +100,7 @@ with col1:
                         )
 
                     content = response.choices[0].message.content
-                    st.write("📄 GPTの返答内容:")
+                    st.write("📄 バナスコの返答内容:")
                     st.code(content)
 
                     # 正規表現で抽出
