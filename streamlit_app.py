@@ -107,7 +107,6 @@ with col1:
                     st.success(f"スコア（{label}）：{score}")
                     st.markdown(f"**改善コメント（{label}）：** {comment}")
 
-                    image_url = upload_image_to_drive_get_url(image, uploaded_file.name)
                     data = {
                         "sheet_name": "record_log",
                         "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -119,7 +118,6 @@ with col1:
                         "result": result,
                         "follower_gain": follower_gain,
                         "memo": memo,
-                        "image_url": image_url
                     }
 
                     st.write("🖋 送信データ:", data)
