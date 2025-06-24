@@ -19,7 +19,8 @@ if not openai_api_key:
 client = OpenAI(api_key=openai_api_key)
 
 # Google Apps ScriptとDrive情報
-GAS_URL = "https://script.google.com/macros/s/AKfycbyEVsQUi54j01OcZFFgPP16F6Dsb0IPJJT11Q2SxX6orhOAybqKc9nkv0HXiDVSEhO3/exec"
+GAS_URL = "https://script.google.com/macros/s/AKfycbz-_vtB8WGKYti-jQ0PJpEbHRneN7itcbZpeUwkV-1kK8XeYp-NJdoimMzoa4_qmwO0/exec"
+
 FOLDER_ID = "1oRyCu2sU9idRrj5tq5foQXp3ArtCW7rP"
 
 def upload_image_to_drive_get_url(pil_image, filename):
@@ -117,20 +118,19 @@ with col1:
 
                     # GAS送信用データ構築（英語キー）
                     data = {
-                        "sheet_name": "record_log",
-                        "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                        "platform": platform,
-                        "category": category,
-                        "has_ad_budget": has_ad_budget,
-                        "purpose": purpose,
-                        "banner_name": banner_name,
-                        "score": score,
-                        "comment": comment,
-                        "result": result,
-                        "follower_gain": follower_gain,
-                        "memo": memo,
-                        "image_url": image_url
-                    }
+    "sheet_name": "record_log",  # ← ここ！
+    "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    "platform": platform,
+    "category": category,
+    "industry": industry,
+    "score": score,
+    "comment": comment,
+    "result": result,
+    "follower_gain": follower_gain,
+    "memo": memo,
+    "image_url": image_url
+}
+
 
                     response = requests.post(GAS_URL, json=data)
                     st.write("📡 GAS応答ステータスコード:", response.status_code)
