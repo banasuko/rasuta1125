@@ -6,9 +6,9 @@ import requests
 from PIL import Image
 from datetime import datetime
 from openai import OpenAI
-image_url = "https://example.com/dummy-image.png"  # 仮の画像URL
+image_url = "https://example.com/dummy-image.png"
 # --- 設定 ---
-openai_api_key = os.getenv("OPENAI_API_KEY")  # ← 追加
+openai_api_key = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=openai_api_key)
 GAS_URL = "AKfycbxjiaQDKTARUWGrDjsDv1WdIYOw3nRu0lo5y1-mcl91Q1aRjyYoENOYBRJNwe5AvH0p"  # あなたのApps Script URL
 FOLDER_ID = "YOUR_GOOGLE_DRIVE_FOLDER_ID"  # 画像保存先のフォルダID
