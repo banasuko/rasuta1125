@@ -1,8 +1,7 @@
 import streamlit as st
 import base64
 import io
-import os
-from dotenv import load_dotenv      
+import os  
 import requests
 from PIL import Image
 from datetime import datetime
