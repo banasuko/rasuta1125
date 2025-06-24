@@ -61,10 +61,12 @@ with col1:
     follower_gain = st.text_input("フォロワー増加（任意）")
     memo = st.text_area("メモ（任意）")
     score_format = st.radio("スコア形式", ["A/B/C", "100点満点"], horizontal=True)
-ab_pattern = st.radio("ABテストパターン", ["Aパターン", "Bパターン", "該当なし"], horizontal=True)
-uploaded_file = st.file_uploader("バナー画像をアップロード", type=["png", "jpg", "jpeg"])
+    ab_pattern = st.radio("ABテストパターン", ["Aパターン", "Bパターン", "該当なし"], horizontal=True)
+    uploaded_file = st.file_uploader("バナー画像をアップロード", type=["png", "jpg", "jpeg"])
 
     if uploaded_file and st.button("🚀 採点＋保存"):
+    # 処理続き...
+
         image = Image.open(uploaded_file)
         st.image(image, caption="アップロード画像", use_column_width=True)
         buf = io.BytesIO()
