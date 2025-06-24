@@ -94,7 +94,8 @@ if uploaded_file and st.button("🚀 採点＋保存"):
     st.markdown(f"**改善コメント：** {comment}")
 
     # Driveに画像アップロード → URL取得
-    image_url = upload_image_to_drive_get_url(image, uploaded_file.name)
+    # Driveアップロードは使わず、仮のURLを使用
+　　image_url = "https://example.com/dummy-image.png"
 
     # GAS送信データ構築（記録用スプシに対応）
     data = {
