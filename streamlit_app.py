@@ -2,6 +2,7 @@ import streamlit as st
 import base64
 import io
 import os
+import re
 import requests
 from PIL import Image
 from datetime import datetime
@@ -9,7 +10,7 @@ from openai import OpenAI
 from pydrive2.auth import GoogleAuth
 from pydrive2.drive import GoogleDrive
 
-# OpenAI APIキー読み込み
+# OpenAI APIキー確認
 openai_api_key = os.getenv("OPENAI_API_KEY")
 if not openai_api_key:
     st.error("❌ OpenAI APIキーが読み込めませんでした。`.env` を確認してください。")
@@ -17,11 +18,10 @@ if not openai_api_key:
 
 client = OpenAI(api_key=openai_api_key)
 
-# Google Apps Script URL & DriveフォルダID
+# Google Apps ScriptとDrive情報
 GAS_URL = "https://script.google.com/macros/s/AKfycbxjiaQDKTARUWGrDjsDv1WdIYOw3nRu0lo5y1-mcl91Q1aRjyYoENOYBRJNwe5AvH0p/exec"
 FOLDER_ID = "1oRyCu2sU9idRrj5tq5foQXp3ArtCW7rP"
 
-# Google Driveアップロード関数
 def upload_image_to_drive_get_url(pil_image, filename):
     gauth = GoogleAuth()
     gauth.LoadCredentialsFile("credentials.json")
@@ -52,7 +52,7 @@ def upload_image_to_drive_get_url(pil_image, filename):
     file_drive.InsertPermission({'type': 'anyone', 'role': 'reader'})
     return f"https://drive.google.com/uc?export=view&id={file_drive['id']}"
 
-# Streamlit UI設定
+# Streamlit UI
 st.set_page_config(layout="wide", page_title="バナスコAI")
 st.title("🧠 バナー広告 採点AI - バナスコ")
 
@@ -84,32 +84,40 @@ with col1:
                     buf = io.BytesIO()
                     image.save(buf, format="PNG")
                     img_str = base64.b64encode(buf.getvalue()).decode()
+
                     with st.spinner(f"AIが{label}パターンを採点中です..."):
                         response = client.chat.completions.create(
                             model="gpt-4o",
                             messages=[
                                 {"role": "system", "content": "あなたは広告のプロです。"},
                                 {"role": "user", "content": [
-                                    {"type": "text", "text": "以下の広告バナーをプロ視点で採点してください：\n\n【評価基準】\n1. 内容が一瞬で伝わるか\n2. コピーの見やすさ\n3. 行動喚起\n4. 写真とテキストの整合性\n5. 情報量のバランス\n\n【出力形式】\nスコア：A/B/C または 100点満点\n改善コメント：2～3行"},
+                                    {"type": "text", "text":
+                                        "以下のバナー画像をプロ視点で採点してください。\n\n【評価基準】\n1. 内容が一瞬で伝わるか\n2. コピーの見やすさ\n3. 行動喚起\n4. 写真とテキストの整合性\n5. 情報量のバランス\n\n【出力形式】\n---\nスコア：A/B/C または 100点満点\n改善コメント：2～3行でお願いします\n---"},
                                     {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str}"}}
                                 ]}
                             ],
                             max_tokens=600
                         )
-                        content = response.choices[0].message.content
-                        score = next((l.replace("スコア：", "").strip() for l in content.splitlines() if "スコア" in l), "")
-                        comment = next((l.replace("改善コメント：", "").strip() for l in content.splitlines() if "改善コメント" in l), "")
-                    
+
+                    content = response.choices[0].message.content
+                    st.write("📄 GPTの返答内容:")
+                    st.code(content)
+
+                    # 正規表現で抽出
+                    score_match = re.search(r"スコア[：:]\s*(.+)", content)
+                    comment_match = re.search(r"改善コメント[：:]\s*(.+)", content)
+
+                    score = score_match.group(1).strip() if score_match else "取得できず"
+                    comment = comment_match.group(1).strip() if comment_match else "取得できず"
+
                     st.success(f"スコア（{label}）：{score}")
                     st.markdown(f"**改善コメント（{label}）：** {comment}")
 
-                    # 画像URL取得
                     image_url = upload_image_to_drive_get_url(image, uploaded_file.name)
 
-                    # GAS送信処理
-                    sheet_name = f"{platform}_{category}用"
+                    # GAS送信用データ構築（英語キー）
                     data = {
-                        "sheet_name": sheet_name,
+                        "sheet_name": "記録用",
                         "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                         "platform": platform,
                         "category": category,
