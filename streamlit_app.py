@@ -115,32 +115,37 @@ with col1:
 
                     image_url = upload_image_to_drive_get_url(image, uploaded_file.name)
 
-                  data = {
-    "sheet_name": "record_log",
-    "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-    "platform": platform,
-    "category": category,
-    "industry": industry,
-    "score": score,
-    "comment": comment,
-    "result": result,
-    "follower_gain": follower_gain,
-    "memo": memo,
-    "image_url": image_url
-}
+                   if st.button("🚀 採点＋保存（A）"):
+    image = Image.open(uploaded_file)
+    st.image(image, caption="Aパターン画像", use_column_width=True)
 
-# ここで表示
-st.write("🖋 送信データ:", data)
+    image_url = upload_image_to_drive_get_url(image, uploaded_file.name)
 
-response = requests.post(GAS_URL, json=data)
-st.write("📡 GAS応答ステータスコード:", response.status_code)
-st.write("📄 GAS応答本文:", response.text)
+    data = {
+        "sheet_name": "record_log",
+        "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "platform": platform,
+        "category": category,
+        "industry": industry,
+        "score": score,
+        "comment": comment,
+        "result": result,
+        "follower_gain": follower_gain,
+        "memo": memo,
+        "image_url": image_url
+    }
 
+    st.write("🖋 送信データ:", data)
+
+    response = requests.post(GAS_URL, json=data)
+    st.write("📡 GAS応答ステータスコード:", response.status_code)
+    st.write("📄 GAS応答本文:", response.text)
 
     if response.status_code == 200:
         st.success("📊 スプレッドシートに記録しました！")
     else:
         st.error("❌ スプレッドシート送信エラー")
+
 
 
 with col2:
