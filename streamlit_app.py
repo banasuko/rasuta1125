@@ -130,6 +130,7 @@ with col1:
     "image_url": image_url
 }
 
+st.write("🧪 送信データ:", data)
 
                     response = requests.post(GAS_URL, json=data)
                     st.write("📡 GAS応答ステータスコード:", response.status_code)
