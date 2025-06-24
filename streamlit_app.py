@@ -2,6 +2,7 @@ import streamlit as st
 import base64
 import io
 import os
+from dotenv import load_dotenv      
 import requests
 from PIL import Image
 from datetime import datetime
@@ -10,9 +11,8 @@ from pydrive2.auth import GoogleAuth
 from pydrive2.drive import GoogleDrive
 
 # --- 設定 ---
-openai_api_key = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=openai_api_key)
-GAS_URL = "https://script.google.com/macros/s/AKfycbyRt9iAJZAjr4yKj_O0BxdyT-GGV8vT6ogJaS_xI6LcW8FV7oE-gRkpVaGzl8D59-5x/exec"
+GAS_URL = "AKfycbxjiaQDKTARUWGrDjsDv1WdIYOw3nRu0lo5y1-mcl91Q1aRjyYoENOYBRJNwe5AvH0p"  # あなたのApps Script URL
 FOLDER_ID = "YOUR_GOOGLE_DRIVE_FOLDER_ID"  # 画像保存先のフォルダID
 
 # --- Google Drive アップロード関数 ---
