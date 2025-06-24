@@ -117,7 +117,7 @@ with col1:
 
                     # GAS送信用データ構築（英語キー）
                     data = {
-                        "sheet_name": "記録用",
+                        "sheet_name": "record_log",
                         "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                         "platform": platform,
                         "category": category,
