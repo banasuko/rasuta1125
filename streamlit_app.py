@@ -77,8 +77,8 @@ with col1:
         uploaded_file_b = st.file_uploader("Bパターン画像をアップロード", type=["png", "jpg", "jpeg"], key="b")
 
     for label, uploaded_file in [("A", uploaded_file_a), ("B", uploaded_file_b)]:
-    if uploaded_file:
-        if st.button(f"🚀 採点＋保存（{label}）"):
+       if uploaded_file:
+           if st.button(f"🚀 採点＋保存（{label}）"):
             image = Image.open(uploaded_file)
             st.image(image, caption=f"{label}パターン画像", use_container_width=True)
             buf = io.BytesIO()
