@@ -129,17 +129,17 @@ with col1:
     "memo": memo,
     "image_url": image_url
 }
+    st.write("🖋 送信データ:", data)
 
-st.write("🧪 送信データ:", data)
+    response = requests.post(GAS_URL, json=data)
+    st.write("📡 GAS応答ステータスコード:", response.status_code)
+    st.write("📄 GAS応答本文:", response.text)
 
-                    response = requests.post(GAS_URL, json=data)
-                    st.write("📡 GAS応答ステータスコード:", response.status_code)
-                    st.write("📄 GAS応答本文:", response.text)
+    if response.status_code == 200:
+        st.success("📊 スプレッドシートに記録しました！")
+    else:
+        st.error("❌ スプレッドシート送信エラー")
 
-                    if response.status_code == 200:
-                        st.success("📊 スプレッドシートに記録しました！")
-                    else:
-                        st.error("❌ スプレッドシート送信エラー")
 
 with col2:
     with st.expander("📌 採点基準はこちら", expanded=False):
