@@ -10,22 +10,20 @@ from openai import OpenAI
 from pydrive2.auth import GoogleAuth
 from pydrive2.drive import GoogleDrive
 
-# OpenAI APIキー確認
+# OpenAI APIキーの読み込み
 openai_api_key = os.getenv("OPENAI_API_KEY")
 if not openai_api_key:
-    st.error("❌ OpenAI APIキーが読み込めませんでした。`.env` を確認してください。")
+    st.error("❌ OpenAI APIキーが見つかりませんでした。`.env` を確認してください。")
     st.stop()
-
 client = OpenAI(api_key=openai_api_key)
 
-# Google Apps ScriptとDrive情報
+# GASとGoogle Driveの情報
 GAS_URL = "https://script.google.com/macros/s/AKfycbzQadO4iuzhETiiDZb2ZQ7et_Rgjb_kR7OIUyL0mK2wqU2-FB2UeN4FVtdyK3Xod3Tm/exec"
 FOLDER_ID = "1oRyCu2sU9idRrj5tq5foQXp3ArtCW7rP"
 
 def upload_image_to_drive_get_url(pil_image, filename):
     gauth = GoogleAuth()
     gauth.LoadCredentialsFile("credentials.json")
-
     try:
         if gauth.credentials is None:
             gauth.CommandLineAuth()
@@ -35,13 +33,11 @@ def upload_image_to_drive_get_url(pil_image, filename):
             gauth.Authorize()
     except:
         gauth.CommandLineAuth()
-
     gauth.SaveCredentialsFile("credentials.json")
-    drive = GoogleDrive(gauth)
 
+    drive = GoogleDrive(gauth)
     temp_path = f"/tmp/{filename}"
     pil_image.save(temp_path, format="PNG")
-
     file_drive = drive.CreateFile({
         'title': filename,
         'mimeType': 'image/png',
@@ -52,7 +48,7 @@ def upload_image_to_drive_get_url(pil_image, filename):
     file_drive.InsertPermission({'type': 'anyone', 'role': 'reader'})
     return f"https://drive.google.com/uc?export=view&id={file_drive['id']}"
 
-# Streamlit UI
+# Streamlit UI設定
 st.set_page_config(layout="wide", page_title="バナスコAI")
 st.title("🧠 バナー広告 採点AI - バナスコ")
 
@@ -76,66 +72,65 @@ with col1:
         uploaded_file_a = st.file_uploader("Aパターン画像をアップロード", type=["png", "jpg", "jpeg"], key="a")
         uploaded_file_b = st.file_uploader("Bパターン画像をアップロード", type=["png", "jpg", "jpeg"], key="b")
 
-    for label, uploaded_file in [("A", uploaded_file_a), ("B", uploaded_file_b)]:
-       if uploaded_file:
-           if st.button(f"🚀 採点＋保存（{label}）"):
-            image = Image.open(uploaded_file)
-            st.image(image, caption=f"{label}パターン画像", use_container_width=True)
-            buf = io.BytesIO()
-            image.save(buf, format="PNG")
-            img_str = base64.b64encode(buf.getvalue()).decode()
+        for label, uploaded_file in [("A", uploaded_file_a), ("B", uploaded_file_b)]:
+            if uploaded_file:
+                if st.button(f"🚀 採点＋保存（{label}）"):
+                    image = Image.open(uploaded_file)
+                    st.image(image, caption=f"{label}パターン画像", use_container_width=True)
+                    buf = io.BytesIO()
+                    image.save(buf, format="PNG")
+                    img_str = base64.b64encode(buf.getvalue()).decode()
 
-            with st.spinner(f"AIが{label}パターンを採点中です..."):
-                response = client.chat.completions.create(
-                    model="gpt-4o",
-                    messages=[
-                        {"role": "system", "content": "あなたは広告のプロです。"},
-                        {"role": "user", "content": [
-                            {"type": "text", "text":
-                                "以下のバナー画像をプロ視点で採点してください。\n\n【評価基準】\n1. 内容が一瞬で伝わるか\n2. コピーの見やすさ\n3. 行動喚起\n4. 写真とテキストの整合性\n5. 情報量のバランス\n\n【出力形式】\n---\nスコア：A/B/C または 100点満点\n改善コメント：2～3行でお願いします\n---"},
-                            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str}"}}
-                        ]}
-                    ],
-                    max_tokens=600
-                )
+                    with st.spinner(f"AIが{label}パターンを採点中です..."):
+                        response = client.chat.completions.create(
+                            model="gpt-4o",
+                            messages=[
+                                {"role": "system", "content": "あなたは広告のプロです。"},
+                                {"role": "user", "content": [
+                                    {"type": "text", "text":
+                                        "以下のバナー画像をプロ視点で採点してください。\n\n【評価基準】\n1. 内容が一瞬で伝わるか\n2. コピーの見やすさ\n3. 行動喚起\n4. 写真とテキストの整合性\n5. 情報量のバランス\n\n【出力形式】\n---\nスコア：A/B/C または 100点満点\n改善コメント：2～3行でお願いします\n---"},
+                                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str}"}}
+                                ]}
+                            ],
+                            max_tokens=600
+                        )
 
-            content = response.choices[0].message.content
-            st.write("📄 バナスコの返答内容:")
-            st.code(content)
+                    content = response.choices[0].message.content
+                    st.write("📄 バナスコの返答内容:")
+                    st.code(content)
 
-            score_match = re.search(r"スコア[：:]\s*(.+)", content)
-            comment_match = re.search(r"改善コメント[：:]\s*(.+)", content)
-            score = score_match.group(1).strip() if score_match else "取得できず"
-            comment = comment_match.group(1).strip() if comment_match else "取得できず"
+                    score_match = re.search(r"スコア[：:]\s*(.+)", content)
+                    comment_match = re.search(r"改善コメント[：:]\s*(.+)", content)
+                    score = score_match.group(1).strip() if score_match else "取得できず"
+                    comment = comment_match.group(1).strip() if comment_match else "取得できず"
 
-            st.success(f"スコア（{label}）：{score}")
-            st.markdown(f"**改善コメント（{label}）：** {comment}")
+                    st.success(f"スコア（{label}）：{score}")
+                    st.markdown(f"**改善コメント（{label}）：** {comment}")
 
-            image_url = upload_image_to_drive_get_url(image, uploaded_file.name)
+                    image_url = upload_image_to_drive_get_url(image, uploaded_file.name)
+                    data = {
+                        "sheet_name": "record_log",
+                        "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "platform": platform,
+                        "category": category,
+                        "industry": industry,
+                        "score": score,
+                        "comment": comment,
+                        "result": result,
+                        "follower_gain": follower_gain,
+                        "memo": memo,
+                        "image_url": image_url
+                    }
 
-            data = {
-                "sheet_name": "record_log",
-                "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "platform": platform,
-                "category": category,
-                "industry": industry,
-                "score": score,
-                "comment": comment,
-                "result": result,
-                "follower_gain": follower_gain,
-                "memo": memo,
-                "image_url": image_url
-            }
+                    st.write("🖋 送信データ:", data)
+                    response = requests.post(GAS_URL, json=data)
+                    st.write("📡 GAS応答ステータスコード:", response.status_code)
+                    st.write("📄 GAS応答本文:", response.text)
 
-            st.write("🖋 送信データ:", data)
-            response = requests.post(GAS_URL, json=data)
-            st.write("📡 GAS応答ステータスコード:", response.status_code)
-            st.write("📄 GAS応答本文:", response.text)
-
-            if response.status_code == 200:
-                st.success("📊 スプレッドシートに記録しました！")
-            else:
-                st.error("❌ スプレッドシート送信エラー")
+                    if response.status_code == 200:
+                        st.success("📊 スプレッドシートに記録しました！")
+                    else:
+                        st.error("❌ スプレッドシート送信エラー")
 
 with col2:
     with st.expander("📌 採点基準はこちら", expanded=False):
