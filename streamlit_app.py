@@ -116,7 +116,7 @@ with col1:
                     image_url = upload_image_to_drive_get_url(image, uploaded_file.name)
 
                    if st.button("🚀 採点＋保存（A）"):
-    image = Image.open(uploaded_file)
+                       image = Image.open(uploaded_file)
     st.image(image, caption="Aパターン画像", use_column_width=True)
 
     image_url = upload_image_to_drive_get_url(image, uploaded_file.name)
