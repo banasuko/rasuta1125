@@ -1,13 +1,13 @@
 import streamlit as st
 import base64
 import io
-import os  
+import os
 import requests
 from PIL import Image
 from datetime import datetime
 from openai import OpenAI
-image_url = "https://example.com/dummy-image.png"
 
+image_url = "https://example.com/dummy-image.png"
 # --- 設定 ---
 openai_api_key = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=openai_api_key)
