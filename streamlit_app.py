@@ -1,3 +1,4 @@
+
 import streamlit as st
 import base64
 import io
@@ -59,7 +60,9 @@ with col1:
     result = st.text_input("実績（任意）")
     follower_gain = st.text_input("フォロワー増加（任意）")
     memo = st.text_area("メモ（任意）")
-    uploaded_file = st.file_uploader("バナー画像をアップロード", type=["png", "jpg", "jpeg"])
+    score_format = st.radio("スコア形式", ["A/B/C", "100点満点"], horizontal=True)
+ab_pattern = st.radio("ABテストパターン", ["Aパターン", "Bパターン", "該当なし"], horizontal=True)
+uploaded_file = st.file_uploader("バナー画像をアップロード", type=["png", "jpg", "jpeg"])
 
     if uploaded_file and st.button("🚀 採点＋保存"):
         image = Image.open(uploaded_file)
@@ -73,22 +76,7 @@ with col1:
                 messages=[
                     {"role": "system", "content": "あなたは広告のプロです。"},
                     {"role": "user", "content": [
-                       {
-    "type": "text",
-    "text": """以下の広告バナーをプロ視点で採点してください：
-
-【評価基準】
-1. 内容が一瞬で伝わるか
-2. コピーの見やすさ
-3. 行動喚起
-4. 写真とテキストの整合性
-5. 情報量のバランス
-
-【出力形式】
-スコア：A/B/C
-改善コメント：2～3行"""
-},
-
+                        {"type": "text", "text": """以下の広告バナーをプロ視点で採点してください：\n\n【評価基準】\n1. 内容が一瞬で伝わるか\n2. コピーの見やすさ\n3. 行動喚起\n4. 写真とテキストの整合性\n5. 情報量のバランス\n\n【出力形式】\nスコア：A/B/C\n改善コメント：2～3行"""},
                         {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str}"}}
                     ]}
                 ],
@@ -101,6 +89,9 @@ with col1:
         st.markdown(f"**改善コメント：** {comment}")
         image_url = upload_image_to_drive_get_url(image, uploaded_file.name)
         data = {
+            "ジャンル": genre,
+            "スコア形式": score_format,
+            "ABパターン": ab_pattern,
             "用途種別": category,
             "提案日": datetime.today().strftime("%Y-%m-%d"),
             "画像URL": image_url,
@@ -128,13 +119,8 @@ with col1:
 
 with col2:
     with st.expander("📌 採点基準はこちら", expanded=False):
-        st.markdown("**1. 内容が一瞬で伝わるか**  
-伝えたいことが最初の1秒で伝わるかどうか")
-        st.markdown("**2. コピーの見やすさ**  
-文字が読みやすく、サイズ・配色が適切か")
-        st.markdown("**3. 行動喚起**  
-「今すぐ予約」「LINE登録」などが明確か")
-        st.markdown("**4. 写真とテキストの整合性**  
-背景画像と文字内容が合っているか")
-        st.markdown("**5. 情報量のバランス**  
-文字が多すぎず、視線誘導があるか")
+        st.markdown("**1. 内容が一瞬で伝わるか**\n伝えたいことが最初の1秒で伝わるかどうか")
+        st.markdown("**2. コピーの見やすさ**\n文字が読みやすく、サイズ・配色が適切か")
+        st.markdown("**3. 行動喚起**\n「今すぐ予約」「LINE登録」などが明確か")
+        st.markdown("**4. 写真とテキストの整合性**\n背景画像と文字内容が合っているか")
+        st.markdown("**5. 情報量のバランス**\n文字が多すぎず、視線誘導があるか")
