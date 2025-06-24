@@ -9,38 +9,50 @@ from openai import OpenAI
 from pydrive2.auth import GoogleAuth
 from pydrive2.drive import GoogleDrive
 
+# OpenAI APIキー読み込み
 openai_api_key = os.getenv("OPENAI_API_KEY")
+if not openai_api_key:
+    st.error("❌ OpenAI APIキーが読み込めませんでした。`.env` を確認してください。")
+    st.stop()
+
 client = OpenAI(api_key=openai_api_key)
+
+# Google Apps Script URL & DriveフォルダID
 GAS_URL = "https://script.google.com/macros/s/AKfycbxjiaQDKTARUWGrDjsDv1WdIYOw3nRu0lo5y1-mcl91Q1aRjyYoENOYBRJNwe5AvH0p/exec"
 FOLDER_ID = "1oRyCu2sU9idRrj5tq5foQXp3ArtCW7rP"
 
+# Google Driveアップロード関数
 def upload_image_to_drive_get_url(pil_image, filename):
     gauth = GoogleAuth()
     gauth.LoadCredentialsFile("credentials.json")
+
     try:
-        if gauth.credentials is None or gauth.access_token_expired:
-            gauth.LocalWebserverAuth()
+        if gauth.credentials is None:
+            gauth.CommandLineAuth()
+        elif gauth.access_token_expired:
+            gauth.Refresh()
         else:
             gauth.Authorize()
-        gauth.SaveCredentialsFile("credentials.json")
     except:
-        gauth.LocalWebserverAuth()
-        gauth.SaveCredentialsFile("credentials.json")
+        gauth.CommandLineAuth()
 
+    gauth.SaveCredentialsFile("credentials.json")
     drive = GoogleDrive(gauth)
-    buf = io.BytesIO()
-    pil_image.save(buf, format="PNG")
-    buf.seek(0)
+
+    temp_path = f"/tmp/{filename}"
+    pil_image.save(temp_path, format="PNG")
+
     file_drive = drive.CreateFile({
         'title': filename,
         'mimeType': 'image/png',
         'parents': [{'id': FOLDER_ID}]
     })
-    file_drive.SetContentString(base64.b64encode(buf.read()).decode(), encoding='base64')
+    file_drive.SetContentFile(temp_path)
     file_drive.Upload()
     file_drive.InsertPermission({'type': 'anyone', 'role': 'reader'})
     return f"https://drive.google.com/uc?export=view&id={file_drive['id']}"
 
+# Streamlit UI設定
 st.set_page_config(layout="wide", page_title="バナスコAI")
 st.title("🧠 バナー広告 採点AI - バナスコ")
 
@@ -57,6 +69,10 @@ with col1:
         genre = st.selectbox("ジャンル", ["お客様の声", "商品紹介", "ノウハウ", "世界観", "キャンペーン"])
         score_format = st.radio("スコア形式", ["A/B/C", "100点満点"], horizontal=True)
         ab_pattern = st.radio("ABテストパターン", ["Aパターン", "Bパターン", "該当なし"], horizontal=True)
+        banner_name = st.text_input("バナー名")
+        result = st.text_input("AI評価結果（任意）")
+        follower_gain = st.text_input("フォロワー増加数（任意）")
+        memo = st.text_area("メモ（任意）")
         uploaded_file_a = st.file_uploader("Aパターン画像をアップロード", type=["png", "jpg", "jpeg"], key="a")
         uploaded_file_b = st.file_uploader("Bパターン画像をアップロード", type=["png", "jpg", "jpeg"], key="b")
 
@@ -83,9 +99,39 @@ with col1:
                         content = response.choices[0].message.content
                         score = next((l.replace("スコア：", "").strip() for l in content.splitlines() if "スコア" in l), "")
                         comment = next((l.replace("改善コメント：", "").strip() for l in content.splitlines() if "改善コメント" in l), "")
+                    
                     st.success(f"スコア（{label}）：{score}")
                     st.markdown(f"**改善コメント（{label}）：** {comment}")
+
+                    # 画像URL取得
                     image_url = upload_image_to_drive_get_url(image, uploaded_file.name)
+
+                    # GAS送信処理
+                    sheet_name = f"{platform}_{category}用"
+                    data = {
+                        "sheet_name": sheet_name,
+                        "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "platform": platform,
+                        "category": category,
+                        "has_ad_budget": has_ad_budget,
+                        "purpose": purpose,
+                        "banner_name": banner_name,
+                        "score": score,
+                        "comment": comment,
+                        "result": result,
+                        "follower_gain": follower_gain,
+                        "memo": memo,
+                        "image_url": image_url
+                    }
+
+                    response = requests.post(GAS_URL, json=data)
+                    st.write("📡 GAS応答ステータスコード:", response.status_code)
+                    st.write("📄 GAS応答本文:", response.text)
+
+                    if response.status_code == 200:
+                        st.success("📊 スプレッドシートに記録しました！")
+                    else:
+                        st.error("❌ スプレッドシート送信エラー")
 
 with col2:
     with st.expander("📌 採点基準はこちら", expanded=False):
