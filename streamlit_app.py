@@ -74,43 +74,42 @@ with col1:
 
         for label, uploaded_file in [("A", uploaded_file_a), ("B", uploaded_file_b)]:
             if uploaded_file:
-               if st.button(f"🚀 採点＋保存（{label}）"):
-                   image = Image.open(uploaded_file)
-                   st.image(image, caption=f"{label}パターン画像", use_container_width=True)
-                   buf = io.BytesIO()
-                   image.save(buf, format="PNG")
-                   img_str = base64.b64encode(buf.getvalue()).decode()
+                if st.button(f"🚀 採点＋保存（{label}）"):
+                    image = Image.open(uploaded_file)
+                    st.image(image, caption=f"{label}パターン画像", use_container_width=True)
+                    buf = io.BytesIO()
+                    image.save(buf, format="PNG")
+                    img_str = base64.b64encode(buf.getvalue()).decode()
 
-    with st.spinner(f"AIが{label}パターンを採点中です..."):
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {"role": "system", "content": "あなたは広告のプロです。"},
-                {"role": "user", "content": [
-                    {"type": "text", "text":
-                        "以下のバナー画像をプロ視点で採点してください。\n\n【評価基準】\n1. 内容が一瞬で伝わるか\n2. コピーの見やすさ\n3. 行動喚起\n4. 写真とテキストの整合性\n5. 情報量のバランス\n\n【出力形式】\n---\nスコア：A/B/C または 100点満点\n改善コメント：2～3行でお願いします\n---"},
-                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str}"}}
-                ]}
-            ],
-            max_tokens=600
-        )
+                    with st.spinner(f"AIが{label}パターンを採点中です..."):
+                        response = client.chat.completions.create(
+                            model="gpt-4o",
+                            messages=[
+                                {"role": "system", "content": "あなたは広告のプロです。"},
+                                {"role": "user", "content": [
+                                    {"type": "text", "text":
+                                        "以下のバナー画像をプロ視点で採点してください。\n\n【評価基準】\n1. 内容が一瞬で伝わるか\n2. コピーの見やすさ\n3. 行動喚起\n4. 写真とテキストの整合性\n5. 情報量のバランス\n\n【出力形式】\n---\nスコア：A/B/C または 100点満点\n改善コメント：2～3行でお願いします\n---"},
+                                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str}"}}
+                                ]}
+                            ],
+                            max_tokens=600
+                        )
 
-    content = response.choices[0].message.content
-    st.write("📄 バナスコの返答内容:")
-    st.code(content)
+                    content = response.choices[0].message.content
+                    st.write("📄 バナスコの返答内容:")
+                    st.code(content)
 
-    score_match = re.search(r"スコア[：:]\s*(.+)", content)
-    comment_match = re.search(r"改善コメント[：:]\s*(.+)", content)
-    score = score_match.group(1).strip() if score_match else "取得できず"
-    comment = comment_match.group(1).strip() if comment_match else "取得できず"
+                    score_match = re.search(r"スコア[：:]\s*(.+)", content)
+                    comment_match = re.search(r"改善コメント[：:]\s*(.+)", content)
+                    score = score_match.group(1).strip() if score_match else "取得できず"
+                    comment = comment_match.group(1).strip() if comment_match else "取得できず"
 
-    st.success(f"スコア（{label}）：{score}")
-    st.markdown(f"**改善コメント（{label}）：** {comment}")
+                    st.success(f"スコア（{label}）：{score}")
+                    st.markdown(f"**改善コメント（{label}）：** {comment}")
 
-    # 薬機法チェック（業種が該当する場合）
-    if industry in ["美容", "健康", "医療"]:
-        with st.spinner("⚖️ 薬機法チェックを実行中..."):
-            yakujihou_prompt = f"""
+                    if industry in ["美容", "健康", "医療"]:
+                        with st.spinner("⚖️ 薬機法チェックを実行中..."):
+                            yakujihou_prompt = f"""
 以下の広告文が薬機法に違反していないかをチェックしてください。
 
 ---
@@ -120,29 +119,21 @@ with col1:
 違反の可能性がある場合は、その理由も具体的に教えてください。
 「OK」「注意あり」どちらかで評価を返してください。
 """
-            try:
-                yakujihou_response = client.chat.completions.create(
-                    model="gpt-4o",
-                    messages=[
-                        {"role": "system", "content": "あなたは広告表現の薬機法チェックを行う専門家です。"},
-                        {"role": "user", "content": yakujihou_prompt}
-                    ],
-                    max_tokens=500,
-                    temperature=0.3,
-                )
-                yakujihou_result = yakujihou_response.choices[0].message.content.strip()
-                st.markdown("### 🛡️ 薬機法チェック結果")
-                st.code(yakujihou_result)
-            except Exception as e:
-                st.error(f"薬機法チェック中にエラーが発生しました: {str(e)}")
-
-    # スプレッドシート送信など残りの処理...
-
-
-
-
-                    st.success(f"スコア（{label}）：{score}")
-                    st.markdown(f"**改善コメント（{label}）：** {comment}")
+                            try:
+                                yakujihou_response = client.chat.completions.create(
+                                    model="gpt-4o",
+                                    messages=[
+                                        {"role": "system", "content": "あなたは広告表現の薬機法チェックを行う専門家です。"},
+                                        {"role": "user", "content": yakujihou_prompt}
+                                    ],
+                                    max_tokens=500,
+                                    temperature=0.3,
+                                )
+                                yakujihou_result = yakujihou_response.choices[0].message.content.strip()
+                                st.markdown("### 🛡️ 薬機法チェック結果")
+                                st.code(yakujihou_result)
+                            except Exception as e:
+                                st.error(f"薬機法チェック中にエラーが発生しました: {str(e)}")
 
                     data = {
                         "sheet_name": "record_log",
