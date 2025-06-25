@@ -103,6 +103,36 @@ with col1:
                     comment_match = re.search(r"改善コメント[：:]\s*(.+)", content)
                     score = score_match.group(1).strip() if score_match else "取得できず"
                     comment = comment_match.group(1).strip() if comment_match else "取得できず"
+                    
+                    # 薬機法チェック対象か判定
+if industry in ["美容", "健康", "医療"]:
+    with st.spinner("⚖️ 薬機法チェックを実行中..."):
+        yakujihou_prompt = f"""
+以下の広告文が薬機法に違反していないかをチェックしてください。
+
+---
+{comment}
+---
+
+違反の可能性がある場合は、その理由も具体的に教えてください。
+「OK」「注意あり」どちらかで評価を返してください。
+"""
+        try:
+            yakujihou_response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": "あなたは広告表現の薬機法チェックを行う専門家です。"},
+                    {"role": "user", "content": yakujihou_prompt}
+                ],
+                max_tokens=500,
+                temperature=0.3,
+            )
+            yakujihou_result = yakujihou_response.choices[0].message.content.strip()
+            st.markdown("### 🛡️ 薬機法チェック結果")
+            st.code(yakujihou_result)
+        except Exception as e:
+            st.error(f\"薬機法チェック中にエラーが発生しました: {str(e)}\")
+
 
                     st.success(f"スコア（{label}）：{score}")
                     st.markdown(f"**改善コメント（{label}）：** {comment}")
