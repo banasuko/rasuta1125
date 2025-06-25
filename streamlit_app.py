@@ -104,7 +104,13 @@ with col1:
                     score = score_match.group(1).strip() if score_match else "取得できず"
                     comment = comment_match.group(1).strip() if comment_match else "取得できず"
                     
-                    # 薬機法チェック対象か判定
+                    score = score_match.group(1).strip() if score_match else "取得できず"
+comment = comment_match.group(1).strip() if comment_match else "取得できず"
+
+st.success(f"スコア（{label}）：{score}")
+st.markdown(f"**改善コメント（{label}）：** {comment}")
+
+# 🔍 薬機法チェック（美容・健康・医療のみ）
 if industry in ["美容", "健康", "医療"]:
     with st.spinner("⚖️ 薬機法チェックを実行中..."):
         yakujihou_prompt = f"""
@@ -132,6 +138,7 @@ if industry in ["美容", "健康", "医療"]:
             st.code(yakujihou_result)
         except Exception as e:
             st.error(f"薬機法チェック中にエラーが発生しました: {str(e)}")
+
 
 
                     st.success(f"スコア（{label}）：{score}")
