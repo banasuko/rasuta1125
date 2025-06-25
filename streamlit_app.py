@@ -75,11 +75,11 @@ with col1:
         for label, uploaded_file in [("A", uploaded_file_a), ("B", uploaded_file_b)]:
             if uploaded_file:
                if st.button(f"🚀 採点＋保存（{label}）"):
-    image = Image.open(uploaded_file)
-    st.image(image, caption=f"{label}パターン画像", use_container_width=True)
-    buf = io.BytesIO()
-    image.save(buf, format="PNG")
-    img_str = base64.b64encode(buf.getvalue()).decode()
+                   image = Image.open(uploaded_file)
+                   st.image(image, caption=f"{label}パターン画像", use_container_width=True)
+                   buf = io.BytesIO()
+                   image.save(buf, format="PNG")
+                   img_str = base64.b64encode(buf.getvalue()).decode()
 
     with st.spinner(f"AIが{label}パターンを採点中です..."):
         response = client.chat.completions.create(
