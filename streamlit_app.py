@@ -131,7 +131,7 @@ if industry in ["美容", "健康", "医療"]:
             st.markdown("### 🛡️ 薬機法チェック結果")
             st.code(yakujihou_result)
         except Exception as e:
-            st.error(f\"薬機法チェック中にエラーが発生しました: {str(e)}\")
+            st.error(f"薬機法チェック中にエラーが発生しました: {str(e)}")
 
 
                     st.success(f"スコア（{label}）：{score}")
