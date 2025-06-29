@@ -7,10 +7,33 @@ import requests
 from PIL import Image
 from datetime import datetime
 from openai import OpenAI
+# pyrebase4とdotenvの直接インポートはauth_utils.pyに移動
+# import pyrebase4
+# from dotenv import load_dotenv
+
+import auth_utils # ✅ auth_utils.py をインポート
+
+
+# GASとGoogle Driveの情報
+# Replace with your deployed GAS URL
+# It's strongly recommended to use your latest deployed GAS URL
+GAS_URL = "https://script.google.com/macros/s/AKfycbxUy3JI5xwncRHxv-WoHHNqiF7LLndhHTOzmLOHtNRJ2hNCo8PJi7-0fdbDjnfAGMlL/exec"
+
+# Helper function to sanitize values (変更なし)
+def sanitize(value):
+    """Replaces None or specific strings with 'エラー' (Error)"""
+    if value is None or value == "取得できず":
+        return "エラー"
+    return value
+
+# Google Drive upload functionality is removed in this version (変更なし)
+
+
+# Streamlit UI configuration
+st.set_page_config(layout="wide", page_title="バナスコAI")
 
 # --- ロゴの表示 ---
 # ロゴ画像のパス
-# あなたが保存したロゴのファイル名に合わせる
 logo_path = "banasuko_logo_icon.png"
 
 # 画像ファイルを読み込み、サイドバーに表示
@@ -20,43 +43,22 @@ try:
 except FileNotFoundError:
     st.sidebar.error(f"ロゴ画像 '{logo_path}' が見つかりません。ファイルが正しく配置されているか確認してください。")
 
+# --- ログインチェックを実行 ---
+# これが最も重要！この行より下は、ログイン済みの場合にのみ実行されます
+auth_utils.check_login() # ✅ 認証ユーティリティを呼び出し
 
-# OpenAI APIキーの読み込み
-openai_api_key = os.getenv("OPENAI_API_KEY")
-if not openai_api_key:
-    st.error("❌ OpenAI APIキーが見つかりませんでした。`.env` を確認してください。")
-    st.stop()
-client = OpenAI(api_key=openai_api_key)
-
-# GASとGoogle Driveの情報
-# Replace with your deployed GAS URL
-# It's strongly recommended to use your latest deployed GAS URL
-GAS_URL = "https://script.google.com/macros/s/AKfycbxUy3JI5xwncRHxv-WoHHNqiF7LLndhHTOzmLOHtNRJ2hNCo8PJi7-0fdbDjnfAGMlL/exec"
-
-# Helper function to sanitize values
-def sanitize(value):
-    """Replaces None or specific strings with 'エラー' (Error)"""
-    if value is None or value == "取得できず":
-        return "エラー"
-    return value
-
-# Google Drive upload functionality is removed in this version
-
-# Streamlit UI configuration
-st.set_page_config(layout="wide", page_title="バナスコAI")
-
-# --- カスタムCSSの追加 (背景色を完全に白に固定 & Newpeace デザインに合わせた明るいテーマ) ---
+# --- カスタムCSSの追加 ---
 st.markdown(
-    f"""
+    """
     <style>
     /* 全体の背景色を強制的に白に設定 */
-    body {{
+    body {
         background-color: #FFFFFF !important;
         background-image: none !important; /* 念のため、背景画像も無効化 */
-    }}
+    }
 
     /* Streamlitのメインコンテナ */
-    .main .block-container {{
+    .main .block-container {
         background-color: #FFFFFF; /* メインコンテナの背景も白 */
         padding-top: 2rem;
         padding-right: 2rem;
@@ -64,17 +66,17 @@ st.markdown(
         padding-bottom: 2rem;
         border-radius: 12px; /* 少し大きめの角丸でモダンに */
         box-shadow: 0px 8px 20px rgba(0, 0, 0, 0.08); /* 柔らかい影 */
-    }}
+    }
 
     /* サイドバー */
-    .stSidebar {{
+    .stSidebar {
         background-color: #F8F8F8; /* 少し明るいグレー */
         border-right: none;
         box-shadow: 2px 0px 10px rgba(0, 0, 0, 0.05);
-    }}
+    }
 
     /* ボタン */
-    .stButton > button {{
+    .stButton > button {
         background-color: #0000FF; /* primaryColor (鮮やかな青) */
         color: white;
         border-radius: 8px; /* 角丸を少し大きく */
@@ -82,32 +84,32 @@ st.markdown(
         box-shadow: 0px 4px 10px rgba(0, 0, 255, 0.2); /* 青い影 */
         transition: background-color 0.2s, box-shadow 0.2s;
         font-weight: bold;
-    }}
-    .stButton > button:hover {{
+    }
+    .stButton > button:hover {
         background-color: #3333FF;
         box-shadow: 0px 6px 15px rgba(0, 0, 255, 0.3);
-    }}
-    .stButton > button:active {{
+    }
+    .stButton > button:active {
         background-color: #0000CC;
         box-shadow: none;
-    }}
+    }
 
     /* Expander */
-    .stExpander {{
+    .stExpander {
         border: 1px solid #E0E0E0;
         border-radius: 8px;
         background-color: #FFFFFF;
         box-shadow: 0px 2px 5px rgba(0,0,0,0.05);
-    }}
-    .stExpander > div > div {{
+    }
+    .stExpander > div > div {
         background-color: #F8F8F8;
         border-bottom: 1px solid #E0E0E0;
         border-top-left-radius: 8px;
         border-top-right-radius: 8px;
-    }}
-    .stExpanderDetails {{
+    }
+    .stExpanderDetails {
         background-color: #FFFFFF;
-    }}
+    }
 
     /* テキスト入力、セレクトボックスなど */
     div[data-baseweb="input"] input,
@@ -116,93 +118,93 @@ st.markdown(
     .stSelectbox .st-bv, /* Selectbox display value */
     .stTextInput .st-eb, /* Text input display */
     .stTextArea .st-eb /* Textarea display */
-    {{
+    {
         background-color: #FFFFFF !important;
         color: #333333 !important;
         border-radius: 8px;
         border: 1px solid #E0E0E0;
         box-shadow: inset 0px 1px 3px rgba(0,0,0,0.05);
-    }}
+    }
     /* フォーカス時のスタイル */
     div[data-baseweb="input"] input:focus,
     div[data-baseweb="select"] span:focus,
     div[data-baseweb="textarea"] textarea:focus,
     div[data-baseweb="input"]:focus-within,
     div[data-baseweb="select"]:focus-within,
-    div[data-baseweb="textarea"]:focus-within {{
+    div[data-baseweb="textarea"]:focus-within {
         border-color: #0000FF;
         box-shadow: 0 0 0 2px rgba(0, 0, 255, 0.3);
-    }}
+    }
 
     /* メトリック */
-    [data-testid="stMetricValue"] {{
+    [data-testid="stMetricValue"] {
         color: #FFD700; /* 鮮やかな黄色 (Newpeaceの黄色をイメージ) */
         font-size: 2.5rem;
         font-weight: bold;
-    }}
-    [data-testid="stMetricLabel"] {{
+    }
+    [data-testid="stMetricLabel"] {
         color: #666666;
         font-size: 0.9rem;
-    }}
-    [data-testid="stMetricDelta"] {{
+    }
+    [data-testid="stMetricDelta"] {
         color: #333333;
-    }}
+    }
 
     /* Info, Success, Warning, Errorボックス */
-    .stAlert {{
+    .stAlert {
         color: #333333;
-    }}
-    .stAlert.stAlert-info {{
+    }
+    .stAlert.stAlert-info {
         background-color: #E0EFFF;
         border-left-color: #0000FF;
-    }}
-    .stAlert.stAlert-success {{
+    }
+    .stAlert.stAlert-success {
         background-color: #E0FFE0;
         border-left-color: #00AA00;
-    }}
-    .stAlert.stAlert-warning {{
+    }
+    .stAlert.stAlert-warning {
         background-color: #FFFBE0;
         border-left-color: #FFD700;
-    }}
-    .stAlert.stAlert-error {{
+    }
+    .stAlert.stAlert-error {
         background-color: #FFE0E0;
         border-left-color: #FF0000;
-    }}
+    }
 
     /* コードブロック */
-    code {{
+    code {
         background-color: #F0F0F0 !important;
         color: #000080 !important;
         border-radius: 5px;
         padding: 0.2em 0.4em;
-    }}
-    pre code {{
+    }
+    pre code {
         background-color: #F0F0F0 !important;
         padding: 1em !important;
         overflow-x: auto;
-    }}
+    }
 
     /* サイドバーのテキスト色を調整 */
     .stSidebar [data-testid="stText"],
     .stSidebar [data-testid="stMarkdownContainer"],
-    .stSidebar .st-emotion-cache-1jm692h {{
+    .stSidebar .st-emotion-cache-1jm692h {
         color: #333333;
-    }}
+    }
 
     /* セレクトボックスのドロップダウンリストの背景色 */
-    div[data-baseweb="popover"] > div {{
+    div[data-baseweb="popover"] > div {
         background-color: #FFFFFF !important;
         color: #333333 !important;
-    }}
+    }
     /* セレクトボックスのドロップダウンリストのアイテムのテキスト色 */
-    div[data-baseweb="popover"] > div > ul > li {{
+    div[data-baseweb="popover"] > div > ul > li {
         color: #333333 !important;
-    }}
+    }
     /* セレクトボックスのドロップダウンリストのホバー色 */
-    div[data-baseweb="popover"] > div > ul > li[data-mouse-entered="true"] {{
+    div[data-baseweb="popover"] > div > ul > li[data-mouse-entered="true"] {
         background-color: #E0EFFF !important; /* 薄い青 */
         color: #0000FF !important; /* アクセントの青 */
-    }}
+    }
 
 
     </style>
@@ -211,13 +213,14 @@ st.markdown(
 )
 # --- カスタムCSSの終わり ---
 
+# --- アプリケーション本体（ログイン済みの場合のみ実行） ---
 st.title("🧠 バナー広告 採点AI - バナスコ")
 st.subheader("〜もう、無駄打ちしない。広告を“武器”に変えるAIツール〜")
 
 col1, col2 = st.columns([2, 1])
 
 with col1:
-    with st.container(border=True): # This border=True is styled by config.toml and CSS
+    with st.container(border=True):
         st.subheader("📝 バナー情報入力フォーム")
 
         with st.expander("👤 基本情報", expanded=True):
@@ -229,7 +232,7 @@ with col1:
             )
             platform = st.selectbox("媒体", ["Instagram", "GDN", "YDN"], key="platform_select")
             category = st.selectbox("カテゴリ", ["広告", "投稿"] if platform == "Instagram" else ["広告"], key="category_select")
-            has_ad_budget = st.selectbox("広告予算", ["あり", "なし"], key="budget_select")
+            has_ad_budget = st.selectbox("広告予算", ["あり", "なし"], key="budget_budget_select")
             
             purpose = st.selectbox(
                 "目的",
@@ -286,7 +289,7 @@ with col1:
 2. コピーの見やすさ
 3. 行動喚起
 4. 写真とテキストの整合性
-4. 情報量のバランス
+5. 情報量のバランス
 
 【ターゲット年代「{age_group}」と目的「{purpose}」を考慮した具体的なフィードバックをお願いします。】
 
@@ -470,7 +473,7 @@ with col1:
                             st.error(f"AI採点中にエラーが発生しました（Bパターン）: {str(e)}")
                             st.session_state.score_b = "エラー"
                             st.session_state.comment_b = "AI応答エラー"
-                            
+                    
                     st.success("Bパターンの診断が完了しました！")
 
             with result_col_b:
