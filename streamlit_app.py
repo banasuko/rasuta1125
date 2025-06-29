@@ -79,7 +79,7 @@ with col1:
             img_col_a, result_col_a = st.columns([1, 2]) # Image 1 part, results 2 parts
 
             with img_col_a:
-                st.image(Image.open(uploaded_file_a), caption="Aパターン画像", use_container_width=True)
+                st.image(Image.open(uploaded_file_a), caption="Aパターン画像", use_container_width=True) # use_container_widthでカラム幅に合わせる
                 if st.button("🚀 Aパターンを採点", key="score_a_btn"): # Changed button name
                     image_a = Image.open(uploaded_file_a)
                     buf_a = io.BytesIO()
@@ -124,7 +124,8 @@ with col1:
                             try:
                                 response_gas_a = requests.post(GAS_URL, json=data_a)
                                 if response_gas_a.status_code == 200:
-                                    st.success("📊 スプレッドシートに記録しました！（Aパターン）")
+                                    # st.success("📊 スプレッドシートに記録しました！（Aパターン）") # ✅【変更】コメントアウト
+                                    pass # 成功メッセージを非表示にする
                                 else:
                                     st.error(f"❌ スプレッドシート送信エラー（Aパターン）: ステータスコード {response_gas_a.status_code}, 応答: {response_gas_a.text}")
                             except requests.exceptions.RequestException as e:
@@ -233,7 +234,8 @@ with col1:
                             try:
                                 response_gas_b = requests.post(GAS_URL, json=data_b)
                                 if response_gas_b.status_code == 200:
-                                    st.success("📊 スプレッドシートに記録しました！（Bパターン）")
+                                    # st.success("📊 スプレッドシートに記録しました！（Bパターン）") # ✅【変更】コメントアウト
+                                    pass # 成功メッセージを非表示にする
                                 else:
                                     st.error(f"❌ スプレッドシート送信エラー（Bパターン）: ステータスコード {response_gas_b.status_code}, 応答: {response_gas_b.text}")
                             except requests.exceptions.RequestException as e:
