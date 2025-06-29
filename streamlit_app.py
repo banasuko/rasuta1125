@@ -7,8 +7,6 @@ import requests
 from PIL import Image
 from datetime import datetime
 from openai import OpenAI
-# from pydrive2.auth import GoogleAuth
-# from pydrive2.drive import GoogleDrive
 
 # OpenAI APIキーの読み込み
 openai_api_key = os.getenv("OPENAI_API_KEY")
@@ -18,22 +16,20 @@ if not openai_api_key:
 client = OpenAI(api_key=openai_api_key)
 
 # GASとGoogle Driveの情報
-# GAS_URL はご自身のデプロイURLに置き換えてください
-# あなたの最新のGAS URLを使うことを強く推奨します
+# Replace with your deployed GAS URL
+# It's strongly recommended to use your latest deployed GAS URL
 GAS_URL = "https://script.google.com/macros/s/AKfycbxUy3JI5xwncRHxv-WoHHNqiF7LLndhHTOzmLOHtNRJ2hNCo8PJi7-0fdbDjnfAGMlL/exec"
-# FOLDER_ID はGoogle Driveの目的のフォルダIDに置き換えてください
-# FOLDER_ID = "1oRyCu2sU9idRrj5tq5foQX3ArtCW7rP" # 今回は使わないため削除
 
-# 値をサニタイズするヘルパー関数
+# Helper function to sanitize values
 def sanitize(value):
-    """Noneや特定の文字列を「エラー」に置き換える"""
+    """Replaces None or specific strings with 'エラー' (Error)"""
     if value is None or value == "取得できず":
         return "エラー"
     return value
 
-# Google Driveアップロード機能は今回は削除されているため、関連関数も削除
+# Google Drive upload functionality is removed in this version
 
-# Streamlit UI設定
+# Streamlit UI configuration
 st.set_page_config(layout="wide", page_title="バナスコAI")
 st.title("🧠 バナー広告 採点AI - バナスコ")
 st.subheader("〜もう、無駄打ちしない。広告を“武器”に変えるAIツール〜")
@@ -60,7 +56,7 @@ with col1:
 
         with st.expander("📌 任意項目", expanded=False):
             result_input = st.text_input("AI評価結果（任意）", help="AIが生成した評価結果を記録したい場合に入力します。", key="result_input_text")
-            follower_gain_input = st.text_input("フォロwer増加数（任意）", help="Instagramなどのフォロwer増加数があれば入力します。", key="follower_gain_input_text")
+            follower_gain_input = st.text_input("フォロワー増加数（任意）", help="Instagramなどのフォロワー増加数があれば入力します。", key="follower_gain_input_text")
             memo_input = st.text_area("メモ（任意）", help="その他、特記事項があれば入力してください。", key="memo_input_area")
 
         st.markdown("---")
@@ -69,7 +65,7 @@ with col1:
         uploaded_file_a = st.file_uploader("Aパターン画像をアップロード", type=["png", "jpg", "jpeg"], key="a_upload")
         uploaded_file_b = st.file_uploader("Bパターン画像をアップロード", type=["png", "jpg", "jpeg"], key="b_upload")
 
-        # 結果をセッションステートで保持するための初期化
+        # Initialize session state for results
         if 'score_a' not in st.session_state: st.session_state.score_a = None
         if 'comment_a' not in st.session_state: st.session_state.comment_a = None
         if 'yakujihou_a' not in st.session_state: st.session_state.yakujihou_a = None
@@ -77,14 +73,14 @@ with col1:
         if 'comment_b' not in st.session_state: st.session_state.comment_b = None
         if 'yakujihou_b' not in st.session_state: st.session_state.yakujihou_b = None
 
-        # --- Aパターン処理 ---
+        # --- A Pattern Processing ---
         if uploaded_file_a:
-            # 画像と診断結果を横並びにするためのカラム設定
-            img_col_a, result_col_a = st.columns([1, 2]) # 画像を1の割合、結果を2の割合で表示
+            # Columns for image and results side-by-side
+            img_col_a, result_col_a = st.columns([1, 2]) # Image 1 part, results 2 parts
 
             with img_col_a:
-                st.image(Image.open(uploaded_file_a), caption="Aパターン画像", use_container_width=True) # use_container_widthでカラム幅に合わせる
-                if st.button("🚀 Aパターンを採点", key="score_a_btn"): # ボタン名を変更
+                st.image(Image.open(uploaded_file_a), caption="Aパターン画像", use_container_width=True)
+                if st.button("🚀 Aパターンを採点", key="score_a_btn"): # Changed button name
                     image_a = Image.open(uploaded_file_a)
                     buf_a = io.BytesIO()
                     image_a.save(buf_a, format="PNG")
@@ -105,28 +101,56 @@ with col1:
                                 max_tokens=600
                             )
                             content_a = response_a.choices[0].message.content
-                            st.session_state.ai_response_a = content_a # AIの生レスポンスも保存
+                            st.session_state.ai_response_a = content_a # Save raw AI response
 
                             score_match_a = re.search(r"スコア[:：]\s*(.+)", content_a)
                             comment_match_a = re.search(r"改善コメント[:：]\s*(.+)", content_a)
                             st.session_state.score_a = score_match_a.group(1).strip() if score_match_a else "取得できず"
                             st.session_state.comment_a = comment_match_a.group(1).strip() if comment_match_a else "取得できず"
+
+                            # --- AUTOMATICALLY RECORD TO SPREADSHEET AFTER SCORING ---
+                            data_a = {
+                                "sheet_name": "record_log",
+                                "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                "platform": sanitize(platform),
+                                "category": sanitize(category),
+                                "industry": sanitize(industry),
+                                "score": sanitize(st.session_state.score_a),
+                                "comment": sanitize(st.session_state.comment_a),
+                                "result": sanitize(result_input),
+                                "follower_gain": sanitize(follower_gain_input),
+                                "memo": sanitize(memo_input),
+                            }
+                            try:
+                                response_gas_a = requests.post(GAS_URL, json=data_a)
+                                if response_gas_a.status_code == 200:
+                                    st.success("📊 スプレッドシートに記録しました！（Aパターン）")
+                                else:
+                                    st.error(f"❌ スプレッドシート送信エラー（Aパターン）: ステータスコード {response_gas_a.status_code}, 応答: {response_gas_a.text}")
+                            except requests.exceptions.RequestException as e:
+                                st.error(f"GASへのデータ送信中にネットワークエラーが発生しました（Aパターン）: {str(e)}")
+                            except Exception as e:
+                                st.error(f"GASへのデータ送信中に予期せぬエラーが発生しました（Aパターン）: {str(e)}")
+                            # --- END AUTOMATIC RECORD ---
+
                         except Exception as e:
                             st.error(f"AI採点中にエラーが発生しました（Aパターン）: {str(e)}")
                             st.session_state.score_a = "エラー"
                             st.session_state.comment_a = "AI応答エラー"
-                    
+                            
                     st.success("Aパターンの診断が完了しました！")
             
-            # 結果表示はボタンのif文の外に置き、画面が再描画されても表示されるようにする
-            with result_col_a: # 結果表示用のカラム
-                if st.session_state.score_a: # スコアが取得されていれば表示
+            # Display results outside the button's if block to persist on re-runs
+            with result_col_a: # Column for results display
+                if st.session_state.score_a: # Only display if score is available
                     st.markdown("### ✨ Aパターン診断結果")
                     st.metric("総合スコア", st.session_state.score_a)
                     st.info(f"**改善コメント:** {st.session_state.comment_a}")
                     
                     if industry in ["美容", "健康", "医療"]:
                         with st.spinner("⚖️ 薬機法チェックを実行中（Aパターン）..."):
+                            # Note: Current Yakujiho check is against AI's improvement comments.
+                            # For checking actual ad copy, a separate input field for ad copy would be needed.
                             yakujihou_prompt_a = f"""
 以下の広告文（改善コメント）が薬機法に違反していないかをチェックしてください。
 ※これはバナー画像の内容に対するAIの改善コメントであり、実際の広告文ではありません。
@@ -157,45 +181,15 @@ with col1:
                                 st.error(f"薬機法チェック中にエラーが発生しました（Aパターン）: {str(e)}")
                                 st.session_state.yakujihou_a = "エラー"
 
-                # 結果がAIによって生成された後に保存ボタンを表示
-                if st.session_state.score_a: # スコアが取得されていれば表示
-                    if st.button("✅ スプレッドシートに記録（Aパターン）", key="save_to_sheet_a_btn"): # ボタン名を変更
-                        data_a = {
-                            "sheet_name": "record_log",
-                            "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                            "platform": sanitize(platform),
-                            "category": sanitize(category),
-                            "industry": sanitize(industry),
-                            "score": sanitize(st.session_state.score_a),
-                            "comment": sanitize(st.session_state.comment_a),
-                            "result": sanitize(result_input),
-                            "follower_gain": sanitize(follower_gain_input),
-                            "memo": sanitize(memo_input),
-                        }
-                        
-                        # st.write("🖋 送信データ（Aパターン）:", data_a) # ✅【変更】コメントアウト
-                        try:
-                            response_gas_a = requests.post(GAS_URL, json=data_a)
-                            if response_gas_a.status_code == 200:
-                                st.success("📊 スプレッドシートに記録しました！（Aパターン）")
-                            else:
-                                st.error(f"❌ スプレッドシート送信エラー（Aパターン）: ステータスコード {response_gas_a.status_code}, 応答: {response_gas_a.text}")
-                            # st.write("📡 GAS応答ステータスコード:", response_gas_a.status_code) # ✅【変更】コメントアウト
-                            # st.write("📄 GAS応答本文:", response_gas_a.text)       # ✅【変更】コメントアウト
-                        except requests.exceptions.RequestException as e:
-                            st.error(f"GASへのデータ送信中にネットワークエラーが発生しました（Aパターン）: {str(e)}")
-                        except Exception as e:
-                            st.error(f"GASへのデータ送信中に予期せぬエラーが発生しました（Aパターン）: {str(e)}")
-            
         st.markdown("---")
 
-        # --- Bパターン処理 --- (Aパターンと同様の変更を適用)
+        # --- B Pattern Processing --- (Similar changes as A pattern applied)
         if uploaded_file_b:
-            img_col_b, result_col_b = st.columns([1, 2]) # 画像を1の割合、結果を2の割合で表示
+            img_col_b, result_col_b = st.columns([1, 2]) # Image 1 part, results 2 parts
 
             with img_col_b:
                 st.image(Image.open(uploaded_file_b), caption="Bパターン画像", use_container_width=True)
-                if st.button("🚀 Bパターンを採点", key="score_b_btn"): # ボタン名を変更
+                if st.button("🚀 Bパターンを採点", key="score_b_btn"): # Changed button name
                     image_b = Image.open(uploaded_file_b)
                     buf_b = io.BytesIO()
                     image_b.save(buf_b, format="PNG")
@@ -222,6 +216,32 @@ with col1:
                             comment_match_b = re.search(r"改善コメント[:：]\s*(.+)", content_b)
                             st.session_state.score_b = score_match_b.group(1).strip() if score_match_b else "取得できず"
                             st.session_state.comment_b = comment_match_b.group(1).strip() if comment_match_b else "取得できず"
+
+                            # --- AUTOMATICALLY RECORD TO SPREADSHEET AFTER SCORING ---
+                            data_b = {
+                                "sheet_name": "record_log",
+                                "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                "platform": sanitize(platform),
+                                "category": sanitize(category),
+                                "industry": sanitize(industry),
+                                "score": sanitize(st.session_state.score_b),
+                                "comment": sanitize(st.session_state.comment_b),
+                                "result": sanitize(result_input),
+                                "follower_gain": sanitize(follower_gain_input),
+                                "memo": sanitize(memo_input),
+                            }
+                            try:
+                                response_gas_b = requests.post(GAS_URL, json=data_b)
+                                if response_gas_b.status_code == 200:
+                                    st.success("📊 スプレッドシートに記録しました！（Bパターン）")
+                                else:
+                                    st.error(f"❌ スプレッドシート送信エラー（Bパターン）: ステータスコード {response_gas_b.status_code}, 応答: {response_gas_b.text}")
+                            except requests.exceptions.RequestException as e:
+                                st.error(f"GASへのデータ送信中にネットワークエラーが発生しました（Bパターン）: {str(e)}")
+                            except Exception as e:
+                                st.error(f"GASへのデータ送信中に予期せぬエラーが発生しました（Bパターン）: {str(e)}")
+                            # --- END AUTOMATIC RECORD ---
+
                         except Exception as e:
                             st.error(f"AI採点中にエラーが発生しました（Bパターン）: {str(e)}")
                             st.session_state.score_b = "エラー"
@@ -229,8 +249,8 @@ with col1:
                     
                     st.success("Bパターンの診断が完了しました！")
 
-            with result_col_b: # 結果表示用のカラム
-                if st.session_state.score_b: # スコアが取得されていれば表示
+            with result_col_b: # Column for results display
+                if st.session_state.score_b: # Only display if score is available
                     st.markdown("### ✨ Bパターン診断結果")
                     st.metric("総合スコア", st.session_state.score_b)
                     st.info(f"**改善コメント:** {st.session_state.comment_b}")
@@ -267,37 +287,8 @@ with col1:
                                 st.error(f"薬機法チェック中にエラーが発生しました（Bパターン）: {str(e)}")
                                 st.session_state.yakujihou_b = "エラー"
 
-                if st.session_state.score_b: # スコアが取得されていれば表示
-                    if st.button("✅ スプレッドシートに記録（Bパターン）", key="save_to_sheet_b_btn"): # ボタン名を変更
-                        data_b = {
-                            "sheet_name": "record_log",
-                            "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                            "platform": sanitize(platform),
-                            "category": sanitize(category),
-                            "industry": sanitize(industry),
-                            "score": sanitize(st.session_state.score_b),
-                            "comment": sanitize(st.session_state.comment_b),
-                            "result": sanitize(result_input),
-                            "follower_gain": sanitize(follower_gain_input),
-                            "memo": sanitize(memo_input),
-                        }
-                        
-                        # st.write("🖋 送信データ（Bパターン）:", data_b) # ✅【変更】コメントアウト
-                        try:
-                            response_gas_b = requests.post(GAS_URL, json=data_b)
-                            if response_gas_b.status_code == 200:
-                                st.success("📊 スプレッドシートに記録しました！（Bパターン）")
-                            else:
-                                st.error(f"❌ スプレッドシート送信エラー（Bパターン）: ステータスコード {response_gas_b.status_code}, 応答: {response_gas_b.text}")
-                            # st.write("📡 GAS応答ステータスコード:", response_gas_b.status_code) # ✅【変更】コメントアウト
-                            # st.write("📄 GAS応答本文:", response_gas_b.text)       # ✅【変更】コメントアウト
-                        except requests.exceptions.RequestException as e:
-                            st.error(f"GASへのデータ送信中にネットワークエラーが発生しました（Bパターン）: {str(e)}")
-                        except Exception as e:
-                            st.error(f"GASへのデータ送信中に予期せぬエラーが発生しました（Bパターン）: {str(e)}")
-
         st.markdown("---")
-        # ABテスト比較機能（両方の診断が完了したら表示）
+        # AB Test Comparison Function (displayed if both scores are available)
         if st.session_state.score_a and st.session_state.score_b and \
            st.session_state.score_a != "エラー" and st.session_state.score_b != "エラー":
             if st.button("📊 A/Bテスト比較を実行", key="ab_compare_final_btn"):
@@ -326,7 +317,7 @@ Bパターン診断結果:
 """
                     try:
                         ab_compare_response = client.chat.completions.create(
-                            model="gpt-4o", # A/B比較もGPT-4oで実行
+                            model="gpt-4o", # A/B comparison also uses GPT-4o
                             messages=[
                                 {"role": "system", "content": "あなたは広告のプロであり、A/Bテストのスペシャリストです。"},
                                 {"role": "user", "content": ab_compare_prompt}
@@ -341,9 +332,10 @@ Bパターン診断結果:
                         st.error(f"A/Bテスト比較中にエラーが発生しました: {str(e)}")
 
 with col2:
-    with st.expander("📌 採点基準はこちら", expanded=True): # デフォルトで開くように変更
+    with st.expander("📌 採点基準はこちら", expanded=True): # Expand by default
         st.markdown("バナスコAIは以下の観点に基づいて広告画像を評価します。")
-        st.markdown("""
+        st.markdown(
+            """
         - **1. 内容が一瞬で伝わるか**
             - 伝えたいことが最初の1秒でターゲットに伝わるか。
         - **2. コピーの見やすさ**
@@ -354,7 +346,10 @@ with col2:
             - 背景画像と文字内容が一致し、全体として違和感がないか。
         - **5. 情報量のバランス**
             - 文字が多すぎず、視線誘導が自然で、情報が過負荷にならないか。
-        """)
-    
+        """
+        )
+
     st.markdown("---")
-    st.info("💡 **ヒント:** スコアやコメントは、広告改善のヒントとしてご活用ください。AIの提案は参考情報であり、最終的な判断は人間が行う必要があります。")
+    st.info(
+        "💡 **ヒント:** スコアやコメントは、広告改善のヒントとしてご活用ください。AIの提案は参考情報であり、最終的な判断は人間が行う必要があります。"
+    )
