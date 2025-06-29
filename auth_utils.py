@@ -1,11 +1,11 @@
 # auth_utils.py
 import streamlit as st
 import os
-import requests # ✅ Firebase Authentication REST API用
+import requests # Firebase Authentication REST API用
 from dotenv import load_dotenv
-import firebase_admin # ✅ Firestore用
-from firebase_admin import credentials, firestore # ✅ Firestore用
-import json # ✅ JSON文字列のパース用
+import firebase_admin # Firestore用
+from firebase_admin import credentials, firestore # Firestore用
+import json # JSON文字列のパース用
 
 # .envファイルから環境変数を読み込む
 load_dotenv()
@@ -60,7 +60,7 @@ if "remaining_uses" not in st.session_state:
 # --- Firebase Authentication REST APIの関数 ---
 def sign_in_with_email_and_password(email, password):
     """Firebase REST API を使ってメールとパスワードでサインインする"""
-    url = f"{FIREBASE_AUTH_BASE_URL}signInWithPassword?key={FIREBASE_API_KEY}"
+    url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={FIREBASE_API_KEY}"
     headers = {"Content-Type": "application/json"}
     data = {
         "email": email,
@@ -73,7 +73,7 @@ def sign_in_with_email_and_password(email, password):
 
 def create_user_with_email_and_password(email, password):
     """Firebase REST API を使ってメールとパスワードでユーザーを作成する"""
-    url = f"{FIREBASE_AUTH_BASE_URL}signUp?key={FIREBASE_API_KEY}"
+    url = f"https://identitytoolkit.googleapis.com/v1/accounts:signUp?key={FIREBASE_API_KEY}"
     headers = {"Content-Type": "application/json"}
     data = {
         "email": email,
@@ -173,7 +173,7 @@ def login_page():
                     user_info = create_user_with_email_and_password(email, password)
                     
                     # アカウント作成成功時、Firestoreに新規ユーザーデータを書き込む
-                    # AuthのsignUpが完了した直後ではFirestoreのドキュメント作成はまだしない
+                    # ただし、AuthのsignUpが完了した直後ではFirestoreのドキュメント作成はまだしない
                     # ログイン時にget_user_data_from_firestoreで自動作成されるようにする (if doc.exists: else:)
                     
                     st.success(f"アカウント '{user_info['email']}' を作成しました。ログインしてください。")
@@ -193,8 +193,6 @@ def login_page():
 def logout():
     """ユーザーをログアウトさせる関数"""
     if st.session_state.get("logged_in"):
-        # Firebase REST API にはログアウトのための直接的なエンドポイントはないため、
-        # セッション情報をクリアすることで「クライアント側でログアウト状態にする」
         keys_to_clear = ["user", "email", "logged_in", "plan", "remaining_uses",
                          "score_a", "comment_a", "yakujihou_a", "score_b", "comment_b", "yakujihou_b",
                          "ai_response_a", "ai_response_b"]
