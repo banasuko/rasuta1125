@@ -3,3 +3,4 @@ pillow
 requests
 openai
 python-dotenv
+firebase-admin
