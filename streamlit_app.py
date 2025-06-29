@@ -18,13 +18,24 @@ if not openai_api_key:
 client = OpenAI(api_key=openai_api_key)
 
 # GASとGoogle Driveの情報
-GAS_URL = "https://script.google.com/macros/s/AKfycbzQadO4iuzhETiiDZb2ZQ7et_Rgjb_kR7OIUyL0mK2wqU2-FB2UeN4FVtdyK3Xod3Tm/exec"
-FOLDER_ID = "1oRyCu2sU9idRrj5tq5foQX3ArtCW7rP" # FOLDER_IDを修正しました。
+# GAS_URL はご自身のデプロイURLに置き換えてください
+GAS_URL = "https://script.google.com/macros/s/AKfycbzSKqG2HuYTgWSBQLYNQQFLRO0dv-BQ_PTZAPv-aklGNE81Ofctnf7BC-TD9nqF0yZe/exec"
+# FOLDER_ID はGoogle Driveの目的のフォルダIDに置き換えてください
+FOLDER_ID = "1oRyCu2sU9idRrj5tq5foQX3ArtCW7rP" 
+
+# 値をサニタイズするヘルパー関数
+def sanitize(value):
+    """Noneや特定の文字列を「エラー」に置き換える"""
+    if value is None or value == "取得できず":
+        return "エラー"
+    return value
 
 def upload_image_to_drive_get_url(pil_image, filename):
     gauth = GoogleAuth()
-    gauth.LoadCredentialsFile("credentials.json")
     try:
+        # Streamlit Cloudのような環境では credentials.json の配置や認証フローに工夫が必要です
+        # サービスアカウントまたはOAuth2.0のWebアプリケーションフローを検討してください
+        gauth.LoadCredentialsFile("credentials.json") 
         if gauth.credentials is None:
             gauth.CommandLineAuth()
         elif gauth.access_token_expired:
@@ -32,23 +43,27 @@ def upload_image_to_drive_get_url(pil_image, filename):
         else:
             gauth.Authorize()
     except Exception as e:
-        # Streamlit環境での認証に関する注意点をユーザーに伝える
         st.error(f"Google Drive認証エラー: {str(e)}。Streamlit Cloudのような環境では、サービスアカウントやOAuth2.0の利用を検討してください。")
-        gauth.CommandLineAuth() # ローカルテスト用
-    gauth.SaveCredentialsFile("credentials.json")
+        # ローカルでのテスト目的でCommandLineAuthを再度試みるが、本番環境では不適切
+        # gauth.CommandLineAuth() 
+        return "UPLOAD_AUTH_ERROR" # エラーを示す特殊な文字列を返す
 
-    drive = GoogleDrive(gauth)
-    temp_path = f"/tmp/{filename}"
-    pil_image.save(temp_path, format="PNG")
-    file_drive = drive.CreateFile({
-        'title': filename,
-        'mimeType': 'image/png',
-        'parents': [{'id': FOLDER_ID}]
-    })
-    file_drive.SetContentFile(temp_path)
-    file_drive.Upload()
-    file_drive.InsertPermission({'type': 'anyone', 'role': 'reader'})
-    return f"https://drive.google.com/uc?export=view&id={file_drive['id']}"
+    try:
+        drive = GoogleDrive(gauth)
+        temp_path = f"/tmp/{filename}"
+        pil_image.save(temp_path, format="PNG")
+        file_drive = drive.CreateFile({
+            'title': filename,
+            'mimeType': 'image/png',
+            'parents': [{'id': FOLDER_ID}]
+        })
+        file_drive.SetContentFile(temp_path)
+        file_drive.Upload()
+        file_drive.InsertPermission({'type': 'anyone', 'role': 'reader'})
+        return f"https://drive.google.com/uc?export=view&id={file_drive['id']}"
+    except Exception as e:
+        st.error(f"Google Driveへの画像アップロード中にエラーが発生しました: {str(e)}")
+        return "UPLOAD_FAILED" # エラーを示す特殊な文字列を返す
 
 # Streamlit UI設定
 st.set_page_config(layout="wide", page_title="バナスコAI")
@@ -139,6 +154,8 @@ with col1:
                 
                 if industry in ["美容", "健康", "医療"]:
                     with st.spinner("⚖️ 薬機法チェックを実行中（Aパターン）..."):
+                        # 注: 現在の薬機法チェックはAIの改善コメントに対して行われます。
+                        # 実際の広告文に対するチェックを行う場合は、別途広告文の入力欄が必要です。
                         yakujihou_prompt_a = f"""
 以下の広告文（改善コメント）が薬機法に違反していないかをチェックしてください。
 ※これはバナー画像の内容に対するAIの改善コメントであり、実際の広告文ではありません。
@@ -169,30 +186,36 @@ with col1:
                             st.error(f"薬機法チェック中にエラーが発生しました（Aパターン）: {str(e)}")
                             st.session_state.yakujihou_a = "エラー"
 
+                # データ送信前にsanitize関数で値をクリーンアップ
                 data_a = {
                     "sheet_name": "record_log",
                     "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "platform": platform,
-                    "category": category,
-                    "industry": industry,
-                    "score": st.session_state.score_a,
-                    "comment": st.session_state.comment_a,
-                    "result": result_input,
-                    "follower_gain": follower_gain_input,
-                    "memo": memo_input,
+                    "platform": sanitize(platform),
+                    "category": sanitize(category),
+                    "industry": sanitize(industry),
+                    "score": sanitize(st.session_state.score_a),
+                    "comment": sanitize(st.session_state.comment_a),
+                    "result": sanitize(result_input),
+                    "follower_gain": sanitize(follower_gain_input),
+                    "memo": sanitize(memo_input),
                 }
                 
+                google_drive_url_a = "N/A"
                 try:
-                    # Google Driveへのアップロードはここで実行
+                    # Google Driveへのアップロード
                     if uploaded_file_a:
                         image_a_pil = Image.open(uploaded_file_a)
                         image_filename_a = f"Banasuko_A_Pattern_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
                         google_drive_url_a = upload_image_to_drive_get_url(image_a_pil, image_filename_a)
-                        data_a["image_url"] = google_drive_url_a # スプレッドシートにURLを追加
-                        st.success(f"Google Driveに画像をアップロードしました: [リンク]({google_drive_url_a})")
+                        if google_drive_url_a not in ["UPLOAD_AUTH_ERROR", "UPLOAD_FAILED"]:
+                            data_a["image_url"] = google_drive_url_a # スプレッドシートにURLを追加
+                            st.success(f"Google Driveに画像をアップロードしました: [リンク]({google_drive_url_a})")
+                        else:
+                            data_a["image_url"] = google_drive_url_a # エラーメッセージをURLとして記録
+                            st.error(f"Google Driveへの画像アップロードに失敗しました（Aパターン）。エラータイプ: {google_drive_url_a}")
                 except Exception as e:
-                    st.error(f"Google Driveへの画像アップロード中にエラーが発生しました（Aパターン）: {str(e)}")
-                    data_a["image_url"] = "アップロード失敗"
+                    st.error(f"Google Driveへの画像アップロード処理中に予期せぬエラーが発生しました（Aパターン）: {str(e)}")
+                    data_a["image_url"] = "UPLOAD_EXCEPTION"
 
                 st.write("🖋 送信データ（Aパターン）:", data_a)
                 try:
@@ -200,9 +223,11 @@ with col1:
                     if response_gas_a.status_code == 200:
                         st.success("📊 スプレッドシートに記録しました！（Aパターン）")
                     else:
-                        st.error(f"❌ スプレッドシート送信エラー（Aパターン）: {response_gas_a.status_code} - {response_gas_a.text}")
+                        st.error(f"❌ スプレッドシート送信エラー（Aパターン）: ステータスコード {response_gas_a.status_code}, 応答: {response_gas_a.text}")
+                except requests.exceptions.RequestException as e:
+                    st.error(f"GASへのデータ送信中にネットワークエラーが発生しました（Aパターン）: {str(e)}")
                 except Exception as e:
-                    st.error(f"GASへのデータ送信中にエラーが発生しました（Aパターン）: {str(e)}")
+                    st.error(f"GASへのデータ送信中に予期せぬエラーが発生しました（Aパターン）: {str(e)}")
         
         st.markdown("---")
 
@@ -251,6 +276,8 @@ with col1:
 
                 if industry in ["美容", "健康", "医療"]:
                     with st.spinner("⚖️ 薬機法チェックを実行中（Bパターン）..."):
+                        # 注: 現在の薬機法チェックはAIの改善コメントに対して行われます。
+                        # 実際の広告文に対するチェックを行う場合は、別途広告文の入力欄が必要です。
                         yakujihou_prompt_b = f"""
 以下の広告文（改善コメント）が薬機法に違反していないかをチェックしてください。
 ※これはバナー画像の内容に対するAIの改善コメントであり、実際の広告文ではありません。
@@ -281,30 +308,36 @@ with col1:
                             st.error(f"薬機法チェック中にエラーが発生しました（Bパターン）: {str(e)}")
                             st.session_state.yakujihou_b = "エラー"
 
+                # データ送信前にsanitize関数で値をクリーンアップ
                 data_b = {
                     "sheet_name": "record_log",
                     "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "platform": platform,
-                    "category": category,
-                    "industry": industry,
-                    "score": st.session_state.score_b,
-                    "comment": st.session_state.comment_b,
-                    "result": result_input,
-                    "follower_gain": follower_gain_input,
-                    "memo": memo_input,
+                    "platform": sanitize(platform),
+                    "category": sanitize(category),
+                    "industry": sanitize(industry),
+                    "score": sanitize(st.session_state.score_b),
+                    "comment": sanitize(st.session_state.comment_b),
+                    "result": sanitize(result_input),
+                    "follower_gain": sanitize(follower_gain_input),
+                    "memo": sanitize(memo_input),
                 }
                 
+                google_drive_url_b = "N/A"
                 try:
-                    # Google Driveへのアップロードはここで実行
+                    # Google Driveへのアップロード
                     if uploaded_file_b:
                         image_b_pil = Image.open(uploaded_file_b)
                         image_filename_b = f"Banasuko_B_Pattern_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
                         google_drive_url_b = upload_image_to_drive_get_url(image_b_pil, image_filename_b)
-                        data_b["image_url"] = google_drive_url_b # スプレッドシートにURLを追加
-                        st.success(f"Google Driveに画像をアップロードしました: [リンク]({google_drive_url_b})")
+                        if google_drive_url_b not in ["UPLOAD_AUTH_ERROR", "UPLOAD_FAILED"]:
+                            data_b["image_url"] = google_drive_url_b # スプレッドシートにURLを追加
+                            st.success(f"Google Driveに画像をアップロードしました: [リンク]({google_drive_url_b})")
+                        else:
+                            data_b["image_url"] = google_drive_url_b # エラーメッセージをURLとして記録
+                            st.error(f"Google Driveへの画像アップロードに失敗しました（Bパターン）。エラータイプ: {google_drive_url_b}")
                 except Exception as e:
-                    st.error(f"Google Driveへの画像アップロード中にエラーが発生しました（Bパターン）: {str(e)}")
-                    data_b["image_url"] = "アップロード失敗"
+                    st.error(f"Google Driveへの画像アップロード処理中に予期せぬエラーが発生しました（Bパターン）: {str(e)}")
+                    data_b["image_url"] = "UPLOAD_EXCEPTION"
 
                 st.write("🖋 送信データ（Bパターン）:", data_b)
                 try:
@@ -312,13 +345,16 @@ with col1:
                     if response_gas_b.status_code == 200:
                         st.success("📊 スプレッドシートに記録しました！（Bパターン）")
                     else:
-                        st.error(f"❌ スプレッドシート送信エラー（Bパターン）: {response_gas_b.status_code} - {response_gas_b.text}")
+                        st.error(f"❌ スプレッドシート送信エラー（Bパターン）: ステータスコード {response_gas_b.status_code}, 応答: {response_gas_b.text}")
+                except requests.exceptions.RequestException as e:
+                    st.error(f"GASへのデータ送信中にネットワークエラーが発生しました（Bパターン）: {str(e)}")
                 except Exception as e:
-                    st.error(f"GASへのデータ送信中にエラーが発生しました（Bパターン）: {str(e)}")
+                    st.error(f"GASへのデータ送信中に予期せぬエラーが発生しました（Bパターン）: {str(e)}")
 
         st.markdown("---")
         # ABテスト比較機能（両方の診断が完了したら表示）
-        if st.session_state.score_a and st.session_state.score_b:
+        if st.session_state.score_a and st.session_state.score_b and \
+           st.session_state.score_a != "エラー" and st.session_state.score_b != "エラー":
             if st.button("📊 A/Bテスト比較を実行", key="ab_compare_final_btn"):
                 with st.spinner("AIがA/Bパターンを比較しています..."):
                     ab_compare_prompt = f"""
