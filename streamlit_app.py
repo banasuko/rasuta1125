@@ -4,19 +4,19 @@ import io
 import os
 import re
 import requests
-from PIL import Image # PIL (Pillow) のインポートはロゴ表示のために必要
+from PIL import Image
 from datetime import datetime
 from openai import OpenAI
 
 # --- ロゴの表示 ---
 # ロゴ画像のパス
-# あなたが保存したロゴのファイル名に合わせる
 logo_path = "banasuko_logo_icon.png"
 
 # 画像ファイルを読み込み、サイドバーに表示
 try:
     logo_image = Image.open(logo_path)
-    st.sidebar.image(logo_image, use_column_width=True) # サイドバーの幅に合わせて表示
+    # ✅ 修正: use_column_width を use_container_width に変更
+    st.sidebar.image(logo_image, use_container_width=True) 
 except FileNotFoundError:
     st.sidebar.error(f"ロゴ画像 '{logo_path}' が見つかりません。ファイルが正しく配置されているか確認してください。")
 
@@ -29,8 +29,6 @@ if not openai_api_key:
 client = OpenAI(api_key=openai_api_key)
 
 # GASとGoogle Driveの情報
-# Replace with your deployed GAS URL
-# It's strongly recommended to use your latest deployed GAS URL
 GAS_URL = "https://script.google.com/macros/s/AKfycbxUy3JI5xwncRHxv-WoHHNqiF7LLndhHTOzmLOHtNRJ2hNCo8PJi7-0fdbDjnfAGMlL/exec"
 
 # Helper function to sanitize values
@@ -45,7 +43,7 @@ def sanitize(value):
 # Streamlit UI configuration
 st.set_page_config(layout="wide", page_title="バナスコAI")
 
-# --- カスタムCSSの追加 (Newpeace デザインに合わせた明るいテーマ) ---
+# --- カスタムCSSの追加 ---
 st.markdown(
     """
     <style>
@@ -188,12 +186,14 @@ st.markdown(
         overflow-x: auto;
     }
 
-    /* サイドバーのデフォルトのテキスト色を調整 */
-    .stSidebar [data-testid="stText"] {
-        color: #333333; /* サイドバーのテキスト色を暗く */
-    }
+    /* サイドバーのデフォルトのテキスト色を調整 (採点基準などのテキストを読みやすくする) */
+    .stSidebar [data-testid="stText"],
     .stSidebar [data-testid="stMarkdownContainer"] {
-        color: #333333; /* Markdownのテキスト色を暗く */
+        color: #333333; /* 暗いテキスト色 */
+    }
+    /* サイドバーのタイトル（pages部分など）の調整 */
+    .stSidebar .st-emotion-cache-1jm692h { /* Streamlitの内部クラス名、バージョンによって変わる可能性あり */
+        color: #333333;
     }
 
 
@@ -468,62 +468,4 @@ with col1:
             if st.button("📊 A/Bテスト比較を実行", key="ab_compare_final_btn"):
                 with st.spinner("AIがA/Bパターンを比較しています..."):
                     ab_compare_prompt = f"""
-以下のAパターンとBパターンの広告診断結果を比較し、総合的にどちらが優れているか、その理由と具体的な改善点を提案してください。
-
----
-Aパターン診断結果:
-スコア: {st.session_state.score_a}
-改善コメント: {st.session_state.comment_a}
-薬機法チェック: {st.session_state.yakujihou_a}
-
-Bパターン診断結果:
-スコア: {st.session_state.score_b}
-改善コメント: {st.session_state.comment_b}
-薬機法チェック: {st.session_state.yakujihou_b}
----
-
-【出力形式】
----
-総合評価: Aパターンが優れている / Bパターンが優れている / どちらも改善が必要
-理由: (2〜3行で簡潔に)
-今後の改善提案: (具体的なアクションを1〜2点)
----
-"""
-                    try:
-                        ab_compare_response = client.chat.completions.create(
-                            model="gpt-4o", # A/B comparison also uses GPT-4o
-                            messages=[
-                                {"role": "system", "content": "あなたは広告のプロであり、A/Bテストのスペシャリストです。"},
-                                {"role": "user", "content": ab_compare_prompt}
-                            ],
-                            max_tokens=700,
-                            temperature=0.5,
-                        )
-                        ab_compare_content = ab_compare_response.choices[0].message.content.strip()
-                        st.markdown("### 📈 A/Bテスト比較結果")
-                        st.write(ab_compare_content)
-                    except Exception as e:
-                        st.error(f"A/Bテスト比較中にエラーが発生しました: {str(e)}")
-
-with col2:
-    with st.expander("📌 採点基準はこちら", expanded=True): # Expand by default
-        st.markdown("バナスコAIは以下の観点に基づいて広告画像を評価します。")
-        st.markdown(
-            """
-        - **1. 内容が一瞬で伝わるか**
-            - 伝えたいことが最初の1秒でターゲットに伝わるか。
-        - **2. コピーの見やすさ**
-            - 文字が読みやすいか、サイズや配色が適切か。
-        - **3. 行動喚起の明確さ**
-            - 『今すぐ予約』『LINE登録』などの行動喚起が明確で、ユーザーを誘導できているか。
-        - **4. 写真とテキストの整合性**
-            - 背景画像と文字内容が一致し、全体として違和感がないか。
-        - **5. 情報量のバランス**
-            - 文字が多すぎず、視線誘導が自然で、情報が過負荷にならないか。
-        """
-        )
-
-    st.markdown("---")
-    st.info(
-        "💡 **ヒント:** スコアやコメントは、広告改善のヒントとしてご活用ください。AIの提案は参考情報であり、最終的な判断は人間が行う必要があります。"
-    )
+以下のAパターンとBパターンの広告診断結果を比較し、総合的にどちら
