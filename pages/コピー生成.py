@@ -1,10 +1,29 @@
 import streamlit as st
-from PIL import Image
-from openai import OpenAI
+import base64
 import io
+import os # ✅ 追加: osモジュールをインポート
+import re
+import requests
+from PIL import Image
+from datetime import datetime
+from openai import OpenAI
 
-# OpenAIクライアント初期化（.streamlit/secrets.toml で設定済みを想定）
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+import auth_utils # ✅ 追加: 認証ユーティリティをインポート
+
+# Streamlit UI設定 (各ページで個別に設定)
+st.set_page_config(layout="wide", page_title="バナスコAI - コピー生成")
+
+# --- ログインチェックを実行 ---
+auth_utils.check_login() # ✅ 認証ユーティリティを呼び出し。未ログインならここで処理が停止する。
+
+# OpenAIクライアント初期化（.envで設定済みを想定）
+# ✅ 修正: st.secrets ではなく os.getenv を使用
+openai_api_key = os.getenv("OPENAI_API_KEY")
+if not openai_api_key:
+    st.error("❌ OpenAI APIキーが見つかりませんでした。`.env` を確認してください。")
+    st.stop()
+client = OpenAI(api_key=openai_api_key)
+
 
 st.title("📸 バナー画像からコピー案を生成")
 
@@ -12,7 +31,8 @@ st.title("📸 バナー画像からコピー案を生成")
 uploaded_image = st.file_uploader("バナー画像をアップロード", type=["jpg", "png"])
 if uploaded_image:
     image = Image.open(uploaded_image)
-    st.image(image, caption="アップロードされた画像", use_column_width=True)
+    # ✅ 修正: use_column_width を use_container_width に変更
+    st.image(image, caption="アップロードされた画像", use_container_width=True)
 
 # 2. カテゴリー選択
 category = st.selectbox("カテゴリーを選択", [
@@ -51,7 +71,7 @@ if st.button("コピーを生成する"):
 
         try:
             response = client.chat.completions.create(
-                model="gpt-4",
+                model="gpt-4", # コピー生成はGPT-4を使用
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
