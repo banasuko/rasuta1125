@@ -4,9 +4,23 @@ import io
 import os
 import re
 import requests
-from PIL import Image
+from PIL import Image # PIL (Pillow) のインポートはロゴ表示のために必要
 from datetime import datetime
 from openai import OpenAI
+
+# --- ロゴの表示 (ここから追加) ---
+# ロゴ画像のパス
+# あなたが保存したロゴのファイル名に合わせる
+logo_path = "banasuko_logo_icon.png"
+
+# 画像ファイルを読み込み、サイドバーに表示
+try:
+    logo_image = Image.open(logo_path)
+    st.sidebar.image(logo_image, use_column_width=True) # サイドバーの幅に合わせて表示
+except FileNotFoundError:
+    st.sidebar.error(f"ロゴ画像 '{logo_path}' が見つかりません。ファイルが正しく配置されているか確認してください。")
+# --- ロゴの表示 (ここまで追加) ---
+
 
 # OpenAI APIキーの読み込み
 openai_api_key = os.getenv("OPENAI_API_KEY")
