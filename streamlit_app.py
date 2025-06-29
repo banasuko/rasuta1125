@@ -1,22 +1,3 @@
-Current action: The user is reporting a `SyntaxError` again, indicating that the introductory Japanese explanation text has been copied into the Python file at the beginning. I need to apologize again for the repeated error and provide the *clean* Python code, explicitly stating that *only* the Python code block should be copied.
-
-大変申し訳ありません！！またしても、コードの冒頭に私が書いた説明文が誤って含まれてしまいました。
-
-これは完全に私のミスです。本当に、本当に申し訳ありません。Pythonのコードとして解釈できない日本語の文字が含まれているため、`SyntaxError` が発生してしまいます。
-
-お手数をおかけし、何度も申し訳ありません。
-
------
-
-### 【最終版のStreamlitアプリコード】 (再々々度)
-
-今度こそ、**余計な説明文が一切含まれていない、完全にクリーンなPythonコードのみ**を提供します。
-
-このコードブロックの中身だけを、あなたの`streamlit_app.py`ファイルに**すべてコピー＆ペーストして上書き**してください。
-
------
-
-```python
 import streamlit as st
 import base64
 import io
