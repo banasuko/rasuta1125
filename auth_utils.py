@@ -1,111 +1,38 @@
 # auth_utils.py
 import streamlit as st
 import os
-import pyrebase
-import requests # Firebase REST APIで使用
+import requests # ✅ Firebase Authentication REST API用
 from dotenv import load_dotenv
+import firebase_admin # ✅ Firestore用
+from firebase_admin import credentials, firestore # ✅ Firestore用
+import json # ✅ JSON文字列のパース用
 
 # .envファイルから環境変数を読み込む
 load_dotenv()
 
-# Firebase設定を環境変数から取得
+# Firebase Authentication REST APIに必要なAPIキーを取得
 FIREBASE_API_KEY = os.getenv("FIREBASE_API_KEY")
 
-# Firebase Auth REST APIのエンドポイントベースURL
-FIREBASE_AUTH_BASE_URL = "https://identitytoolkit.googleapis.com/v1/accounts:"
-
-# Firebase Admin SDK (Firestore用) の設定
-# Firestoreを使うためにFirebase Admin SDKの設定も必要
-# Admin SDKはサービスアカウントの認証情報を使用します
-# Streamlit SecretsにサービスアカウントキーのJSONを文字列として保存するか、
-# .envから読み込むか、別の安全な方法が必要です。
-# 今回は簡単のため、FirebaseConfigのprojectIdを利用して初期化を試みますが
-# 本格的なAdmin SDK利用にはサービスアカウントキーのJSONが必要です。
-# pyrebase(client SDK)とは異なる初期化方法になります。
-# そのため、ここではpyrebaseのFirestore機能を利用します (ただしこれは非推奨)
-
-# Pyrebaseの初期化 (AuthとFirestoreの両方に対応)
-firebaseConfig = {
-    "apiKey": os.getenv("FIREBASE_API_KEY"),
-    "authDomain": os.getenv("FIREBASE_AUTH_DOMAIN"),
-    "projectId": os.getenv("FIREBASE_PROJECT_ID"),
-    "storageBucket": os.getenv("FIREBASE_STORAGE_BUCKET"),
-    "messagingSenderId": os.getenv("FIREBASE_MESSAGING_SENDER_ID"),
-    "appId": os.getenv("FIREBASE_APP_ID"),
-    "measurementId": os.getenv("FIREBASE_MEASUREMENT_ID")
-}
-
-try:
-    firebase = pyrebase.initialize_app(firebaseConfig) # pyrebaseを再利用
-    auth = firebase.auth()
-    db = firebase.database() # Realtime DatabaseではなくFirestoreの場合は client = firebase.firestore() を使うが、
-                              # pyrebaseのfirestore()はpyrebase4で導入された新機能。
-                              # pyrebaseではadmin SDKが必要になるか、あるいはclient SDKとしてはRealtime DBがメイン。
-                              # ここでは、Firebase REST APIでAuthを扱い、Firestoreは別途Admin SDKで。
-                              # OR: pyrebaseを諦め、Firestoreは直接Admin SDKで、AuthはREST APIでやるのが cleanest.
-                              # 上記方針でAuthはREST APIに切り替わったので、pyrebaseはAuthではもう使わない。
-                              # Firestoreの操作のためにpyrebaseを再導入すると依存関係エラーが再発する可能性が高い。
-                              # => ここではFirestoreの操作は、Python Admin SDKに切り替える。
-
-    # Firebase Admin SDKの初期化 (Firestore用)
-    # サービスアカウントキーのJSONファイルパスをStreamlit Secretsから取得する想定
-    # 例: st.secrets["FIREBASE_ADMIN_SDK_CONFIG"] にJSON文字列が保存されている
-    # またはファイルとして配置し、そのパスを指定
-    # 今はローカルテスト用にダミーで初期化を試みるが、本番ではService Account JSON必須
-    # import firebase_admin
-    # from firebase_admin import credentials, firestore
-    #
-    # # この cred.json はFirebaseコンソールからダウンロードしたもの
-    # # 本番デプロイ時は Streamlit Secrets で安全に管理する必要あり
-    # # st.secrets["firebase_admin_sdk_config"] を使うのが推奨
-    # if "firebase_admin_cred" not in st.session_state:
-    #     try:
-    #         # 環境変数またはSecretsからJSON文字列を読み込む
-    #         service_account_info = json.loads(os.getenv("FIREBASE_ADMIN_SDK_CONFIG"))
-    #         cred = credentials.Certificate(service_account_info)
-    #         firebase_admin.initialize_app(cred)
-    #         st.session_state.firebase_admin_cred = True
-    #     except Exception as e:
-    #         st.error(f"Firebase Admin SDKの初期化に失敗しました。サービスアカウントキーを確認してください: {e}")
-    #         st.stop()
-    # db = firestore.client() # Firestoreクライアント
-
-    # セッションステートを初期化
-    if "logged_in" not in st.session_state:
-        st.session_state.logged_in = False
-    if "user" not in st.session_state:
-        st.session_state.user = None
-    if "email" not in st.session_state:
-        st.session_state.email = None
-    if "plan" not in st.session_state: # プラン情報
-        st.session_state.plan = "Guest"
-    if "remaining_uses" not in st.session_state: # 残り回数
-        st.session_state.remaining_uses = 0
-    if "firebase_initialized" not in st.session_state:
-        st.session_state.firebase_initialized = True
-
-except Exception as e:
-    st.error(f"Firebaseの初期化に失敗しました。`.env`ファイルの設定、またはFirebaseConfigの内容を確認してください: {e}")
+if not FIREBASE_API_KEY:
+    st.error("Firebase APIキーが.envファイルに見つかりません。")
     st.stop()
 
+# Firebase Authentication REST APIのエンドポイントベースURL
+FIREBASE_AUTH_BASE_URL = "https://identitytoolkit.googleapis.com/v1/accounts:"
 
-# Firestore操作のための Admin SDK
-import firebase_admin # ✅ 追加
-from firebase_admin import credentials, firestore # ✅ 追加
-import json # ✅ 追加
-
-# サービスアカウントキーの設定
-# これはStreamlit Secretsに保存することを強く推奨します
-# secrets.tomlに [firebase_admin] service_account_key = "{...JSONキーをここにペースト...}"
-# または環境変数 FIREBASE_ADMIN_SDK_CONFIG にJSON文字列を保存
+# --- Firebase Admin SDKの初期化 (Firestore用) ---
+# これはFirebaseのサービスアカウントキーが必要です。
+# .envファイル、またはStreamlit SecretsにJSON文字列として保存することを強く推奨します。
+# 例: FIREBASE_ADMIN_SDK_CONFIG='{"type": "service_account", "project_id": "...", ...}'
 try:
     if "firebase_admin_initialized" not in st.session_state:
-        # 環境変数からJSON文字列を読み込み、Python辞書に変換
         service_account_info_str = os.getenv("FIREBASE_ADMIN_SDK_CONFIG")
+        
         if not service_account_info_str:
             st.error("環境変数 'FIREBASE_ADMIN_SDK_CONFIG' が設定されていません。Firebase Admin SDKのサービスアカウントキーが必要です。")
             st.stop()
         
+        # JSON文字列をPython辞書に変換
         service_account_info = json.loads(service_account_info_str)
         
         cred = credentials.Certificate(service_account_info)
@@ -114,11 +41,55 @@ try:
         db = firestore.client() # Firestoreクライアントを初期化
 except Exception as e:
     st.error(f"Firebase Admin SDKの初期化に失敗しました。サービスアカウントキーを確認してください: {e}")
-    st.stop()
+    st.stop() # Admin SDK初期化失敗時はアプリの実行を停止
 
 
+# Streamlitのセッションステートを初期化 (初回ロード時のみ)
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+if "user" not in st.session_state:
+    st.session_state.user = None
+if "email" not in st.session_state:
+    st.session_state.email = None
+if "plan" not in st.session_state:
+    st.session_state.plan = "Guest"
+if "remaining_uses" not in st.session_state:
+    st.session_state.remaining_uses = 0
+
+
+# --- Firebase Authentication REST APIの関数 ---
+def sign_in_with_email_and_password(email, password):
+    """Firebase REST API を使ってメールとパスワードでサインインする"""
+    url = f"{FIREBASE_AUTH_BASE_URL}signInWithPassword?key={FIREBASE_API_KEY}"
+    headers = {"Content-Type": "application/json"}
+    data = {
+        "email": email,
+        "password": password,
+        "returnSecureToken": True
+    }
+    response = requests.post(url, headers=headers, json=data)
+    response.raise_for_status() # HTTPエラーが発生した場合に例外を発生させる
+    return response.json()
+
+def create_user_with_email_and_password(email, password):
+    """Firebase REST API を使ってメールとパスワードでユーザーを作成する"""
+    url = f"{FIREBASE_AUTH_BASE_URL}signUp?key={FIREBASE_API_KEY}"
+    headers = {"Content-Type": "application/json"}
+    data = {
+        "email": email,
+        "password": password,
+        "returnSecureToken": True
+    }
+    response = requests.post(url, headers=headers, json=data)
+    response.raise_for_status() # HTTPエラーが発生した場合に例外を発生させる
+    return response.json()
+
+
+# --- Firestoreの操作関数 ---
 def get_user_data_from_firestore(uid):
     """Firestoreからユーザーのプランと利用回数を取得する"""
+    # グローバルなdbオブジェクトを使用
+    global db 
     doc_ref = db.collection('users').document(uid)
     doc = doc_ref.get()
     if doc.exists:
@@ -141,6 +112,8 @@ def get_user_data_from_firestore(uid):
 
 def update_user_uses_in_firestore(uid, uses_to_deduct=1):
     """Firestoreのユーザー利用回数を減らす"""
+    # グローバルなdbオブジェクトを使用
+    global db
     doc_ref = db.collection('users').document(uid)
     try:
         doc_ref.update({
@@ -155,6 +128,7 @@ def update_user_uses_in_firestore(uid, uses_to_deduct=1):
         return False
 
 
+# --- StreamlitのUI表示と認証フロー ---
 def login_page():
     """Streamlit上にログイン画面を表示する関数"""
     st.title("🔐 バナスコAI ログイン")
@@ -167,52 +141,60 @@ def login_page():
 
     with login_col:
         if st.button("ログイン", key="login_button"):
-            try:
-                user_info = sign_in_with_email_and_password(email, password)
-                st.session_state["user"] = user_info["localId"]
-                st.session_state["email"] = user_info["email"]
-                st.session_state["logged_in"] = True
-                
-                # ログイン成功時、Firestoreからユーザーデータを読み込む
-                get_user_data_from_firestore(st.session_state["user"])
+            with st.spinner("ログイン中..."):
+                try:
+                    user_info = sign_in_with_email_and_password(email, password)
+                    st.session_state["user"] = user_info["localId"]
+                    st.session_state["email"] = user_info["email"]
+                    st.session_state["logged_in"] = True
+                    
+                    # ログイン成功時、Firestoreからユーザーデータを読み込む
+                    get_user_data_from_firestore(st.session_state["user"])
 
-                st.success(f"ログインしました: {user_info['email']}")
-                st.rerun()
-            except requests.exceptions.HTTPError as e:
-                error_code = e.response.json().get("error", {}).get("message", "Unknown error")
-                if error_code == "EMAIL_NOT_FOUND" or error_code == "INVALID_PASSWORD":
-                    st.error("ログインに失敗しました。メールアドレスまたはパスワードが間違っています。")
-                elif error_code == "USER_DISABLED":
-                    st.error("このアカウントは無効化されています。")
-                else:
-                    st.error(f"ログイン中にエラーが発生しました: {error_code}")
-            except Exception as e:
-                st.error(f"予期せぬエラーが発生しました: {e}")
+                    st.success(f"ログインしました: {user_info['email']}")
+                    st.rerun() # ログイン後、アプリを再実行してメインコンテンツを表示
+                except requests.exceptions.HTTPError as e:
+                    error_json = e.response.json()
+                    error_code = error_json.get("error", {}).get("message", "Unknown error")
+                    if error_code == "EMAIL_NOT_FOUND" or error_code == "INVALID_PASSWORD":
+                        st.error("ログインに失敗しました。メールアドレスまたはパスワードが間違っています。")
+                    elif error_code == "USER_DISABLED":
+                        st.error("このアカウントは無効化されています。")
+                    else:
+                        st.error(f"ログイン中にエラーが発生しました: {error_code}")
+                        # st.error(error_json) # デバッグ用
+                except Exception as e:
+                    st.error(f"予期せぬエラーが発生しました: {e}")
 
     with create_col:
         if st.button("アカウント作成", key="create_account_button"):
-            try:
-                user_info = create_user_with_email_and_password(email, password)
-                
-                # アカウント作成成功時、Firestoreに新規ユーザーデータを書き込む
-                # ただし、AuthのsignUpが完了した直後ではFirestoreのドキュメント作成はまだしない
-                # ログイン時にget_user_data_from_firestoreで自動作成されるようにする
-                
-                st.success(f"アカウント '{user_info['email']}' を作成しました。ログインしてください。")
-            except requests.exceptions.HTTPError as e:
-                error_code = e.response.json().get("error", {}).get("message", "Unknown error")
-                if error_code == "EMAIL_EXISTS":
-                    st.error("このメールアドレスは既に使用されています。")
-                elif error_code == "WEAK_PASSWORD":
-                    st.error("パスワードが弱すぎます（6文字以上必要）。")
-                else:
-                    st.error(f"アカウント作成中にエラーが発生しました: {error_code}")
-            except Exception as e:
-                st.error(f"予期せぬエラーが発生しました: {e}")
+            with st.spinner("アカウント作成中..."):
+                try:
+                    user_info = create_user_with_email_and_password(email, password)
+                    
+                    # アカウント作成成功時、Firestoreに新規ユーザーデータを書き込む
+                    # AuthのsignUpが完了した直後ではFirestoreのドキュメント作成はまだしない
+                    # ログイン時にget_user_data_from_firestoreで自動作成されるようにする (if doc.exists: else:)
+                    
+                    st.success(f"アカウント '{user_info['email']}' を作成しました。ログインしてください。")
+                except requests.exceptions.HTTPError as e:
+                    error_json = e.response.json()
+                    error_code = error_json.get("error", {}).get("message", "Unknown error")
+                    if error_code == "EMAIL_EXISTS":
+                        st.error("このメールアドレスは既に使用されています。")
+                    elif error_code == "WEAK_PASSWORD":
+                        st.error("パスワードが弱すぎます（6文字以上必要）。")
+                    else:
+                        st.error(f"アカウント作成中にエラーが発生しました: {error_code}")
+                        # st.error(error_json) # デバッグ用
+                except Exception as e:
+                    st.error(f"予期せぬエラーが発生しました: {e}")
 
 def logout():
     """ユーザーをログアウトさせる関数"""
     if st.session_state.get("logged_in"):
+        # Firebase REST API にはログアウトのための直接的なエンドポイントはないため、
+        # セッション情報をクリアすることで「クライアント側でログアウト状態にする」
         keys_to_clear = ["user", "email", "logged_in", "plan", "remaining_uses",
                          "score_a", "comment_a", "yakujihou_a", "score_b", "comment_b", "yakujihou_b",
                          "ai_response_a", "ai_response_b"]
@@ -220,17 +202,17 @@ def logout():
             if key in st.session_state:
                 del st.session_state[key]
         st.success("ログアウトしました。")
-        st.rerun()
+        st.rerun() # ログアウト後、アプリを再実行してログイン画面に戻る
 
 def check_login():
     """
     ユーザーのログイン状態をチェックし、未ログインならログインページを表示してアプリの実行を停止する。
     Firestoreの残り回数も確認し、サイドバーに表示する。
     """
-    # Firebase Admin SDKの初期化状態を確認
-    if "firebase_admin_initialized" not in st.session_state:
-        st.error("Firebase Admin SDKが初期化されていません。サービスアカウントキーが正しく設定されているか確認してください。")
-        st.stop() # 初期化エラーならここで停止
+    # Admin SDKの初期化状態を確認
+    if not st.session_state.get("firebase_admin_initialized"):
+        # Admin SDKの初期化エラーの場合は、ログにエラーが出ているはずなので、ここで停止
+        st.stop() 
 
     # サイドバーに現在のユーザー名とログアウトボタン、残り回数を配置
     if st.session_state.get("logged_in"):
