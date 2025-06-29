@@ -15,8 +15,7 @@ logo_path = "banasuko_logo_icon.png"
 # 画像ファイルを読み込み、サイドバーに表示
 try:
     logo_image = Image.open(logo_path)
-    # ✅ 修正: use_column_width を use_container_width に変更
-    st.sidebar.image(logo_image, use_container_width=True) 
+    st.sidebar.image(logo_image, use_container_width=True) # サイドバーの幅に合わせて表示
 except FileNotFoundError:
     st.sidebar.error(f"ロゴ画像 '{logo_path}' が見つかりません。ファイルが正しく配置されているか確認してください。")
 
@@ -47,102 +46,103 @@ st.set_page_config(layout="wide", page_title="バナスコAI")
 st.markdown(
     """
     <style>
-    /* 全体の背景色を白基調に */
+    /* 全体の背景に微細なグリッドパターンとグラデーション */
     body {
-        background-color: #FFFFFF; /* config.tomlのbackgroundColorと一致させる */
-        /* 背景パターンは完全に削除し、純粋な白にする */
-        background-image: none; 
+        background: radial-gradient(circle at top left, #1a1a1a, #0a0a0a);
+        background-repeat: repeat;
+        background-size: 20px 20px;
+        background-image: 
+            linear-gradient(to right, #2a2a2a 1px, transparent 1px),
+            linear-gradient(to bottom, #2a2a2a 1px, transparent 1px);
+        background-attachment: fixed;
     }
 
-    /* Streamlitのメインコンテナに影と角丸 */
+    /* Streamlitのメインコンテナに影と少しの角丸 */
     .main .block-container {
         padding-top: 2rem;
         padding-right: 2rem;
         padding-left: 2rem;
         padding-bottom: 2rem;
-        border-radius: 12px; /* 少し大きめの角丸でモダンに */
-        box-shadow: 0px 8px 20px rgba(0, 0, 0, 0.08); /* 柔らかい影 */
-        background-color: #FFFFFF; /* メインコンテナの背景も白 */
+        border-radius: 8px; /* 少し角丸 */
+        box-shadow: 0px 4px 15px rgba(0, 229, 118, 0.2); /* primaryColorのシャドウ */
+        background-color: #1a1a1a; /* main background to match */
     }
 
     /* サイドバーの背景色をテーマに合わせて調整 */
     .stSidebar {
-        background-color: #F8F8F8; /* secondaryBackgroundColorに合わせる (わずかにグレーがかった白) */
-        border-right: none; /* ボーダー削除でクリーンに */
-        box-shadow: 2px 0px 10px rgba(0, 0, 0, 0.05); /* サイドバーに影 */
+        background-color: #1E1E1E; /* secondaryBackgroundColorに合わせる */
+        border-right: 1px solid #333;
     }
     
-    /* ボタンのスタイル調整 */
+    /* ボタンのスタイル調整（よりシャープに、アクティブ感を出す） */
     .stButton > button {
-        background-color: #0000FF; /* primaryColor (鮮やかな青) */
+        background-color: #008040; /* primaryColorより少し暗め */
         color: white;
-        border-radius: 8px; /* 角丸を少し大きく */
-        border: none; /* ボーダー削除 */
-        box-shadow: 0px 4px 10px rgba(0, 0, 255, 0.2); /* 青い影 */
+        border-radius: 5px;
+        border: 1px solid #00E676; /* primaryColorのボーダー */
+        box-shadow: 0px 2px 5px rgba(0, 229, 118, 0.2);
         transition: background-color 0.2s, box-shadow 0.2s;
-        font-weight: bold; /* フォントを太く */
     }
     .stButton > button:hover {
-        background-color: #3333FF; /* ホバーで少し明るい青 */
-        box-shadow: 0px 6px 15px rgba(0, 0, 255, 0.3);
+        background-color: #00B359; /* ホバーで少し明るく */
+        box-shadow: 0px 4px 10px rgba(0, 229, 118, 0.4);
     }
     .stButton > button:active {
-        background-color: #0000CC; /* クリック時に少し暗い青 */
+        background-color: #006633; /* クリック時にさらに暗く */
         box-shadow: none;
     }
 
-    /* Expanderのスタイル調整 */
+    /* Expanderのボーダーと背景（メカニックなコンポーネント感を出す） */
     .stExpander {
-        border: 1px solid #E0E0E0; /* 薄いグレーのボーダー */
-        border-radius: 8px;
-        background-color: #FFFFFF; /* 背景を白に */
-        box-shadow: 0px 2px 5px rgba(0,0,0,0.05); /* 柔らかい影 */
+        border: 1px solid #333;
+        border-radius: 5px;
+        background-color: #282828; /* 少し明るい背景で目立たせる */
+        box-shadow: 0px 1px 3px rgba(0,0,0,0.3);
     }
     .stExpander > div > div { /* ヘッダー部分 */
-        background-color: #F8F8F8; /* secondaryBackgroundColorに合わせる */
-        border-bottom: 1px solid #E0E0E0;
-        border-top-left-radius: 8px;
-        border-top-right-radius: 8px;
+        background-color: #333;
+        border-bottom: 1px solid #444;
+        border-top-left-radius: 5px;
+        border-top-right-radius: 5px;
     }
     .stExpanderDetails { /* 展開される内容部分 */
-        background-color: #FFFFFF; /* Expander本体と同じ */
+        background-color: #282828; /* Expander本体と同じ */
     }
 
-    /* テキスト入力、セレクトボックスなどのスタイル */
+    /* テキスト入力、セレクトボックスなどの背景 */
     div[data-baseweb="input"],
     div[data-baseweb="select"],
     div[data-baseweb="textarea"] {
-        background-color: #FFFFFF; /* 背景を白に */
-        border-radius: 8px;
-        border: 1px solid #E0E0E0; /* 薄いグレーのボーダー */
-        color: #333333; /* テキスト色を暗く */
-        box-shadow: inset 0px 1px 3px rgba(0,0,0,0.05); /* わずかな内側の影 */
+        background-color: #333333;
+        border-radius: 5px;
+        border: 1px solid #555555;
+        color: #E0E0E0;
     }
     /* テキスト入力、セレクトボックスなどのテキスト色 */
     div[data-baseweb="input"] input,
     div[data-baseweb="select"] span,
     div[data-baseweb="textarea"] textarea {
-        color: #333333 !important; /* テキスト色を暗く */
+        color: #E0E0E0 !important;
     }
     div[data-baseweb="input"]:focus-within,
     div[data-baseweb="select"]:focus-within,
     div[data-baseweb="textarea"]:focus-within {
-        border-color: #0000FF; /* フォーカス時にアクセントカラー（青） */
-        box-shadow: 0 0 0 2px rgba(0, 0, 255, 0.3); /* 青い影 */
+        border-color: #00E676; /* フォーカス時にアクセントカラー */
+        box-shadow: 0 0 0 1px #00E676;
     }
 
     /* メトリック (st.metric) の表示を強調 */
     [data-testid="stMetricValue"] {
-        color: #FFD700; /* 鮮やかな黄色 (Newpeaceの黄色をイメージ) */
-        font-size: 2.5rem;
+        color: #00E676; /* アクセントカラー */
+        font-size: 2.5rem; /* 大きめのフォントサイズ */
         font-weight: bold;
     }
     [data-testid="stMetricLabel"] {
-        color: #666666; /* 少し暗めのラベル色 */
+        color: #B0B0B0;
         font-size: 0.9rem;
     }
     [data-testid="stMetricDelta"] {
-        color: #333333; /* デルタ（変化量）のテキスト色 */
+        color: #E0E0E0; /* デルタ（変化量）のテキスト色 */
     }
 
     /* Infoボックスの強調 */
@@ -209,15 +209,29 @@ st.subheader("〜もう、無駄打ちしない。広告を“武器”に変え
 col1, col2 = st.columns([2, 1])
 
 with col1:
-    with st.container(border=True): # This border=True is styled by config.toml and CSS
+    with st.container(border=True):
         st.subheader("📝 バナー情報入力フォーム")
 
         with st.expander("👤 基本情報", expanded=True):
             user_name = st.text_input("ユーザー名", key="user_name_input")
+            # --- 年代カテゴリーの追加 ---
+            age_group = st.selectbox(
+                "ターゲット年代",
+                ["指定なし", "10代", "20代", "30代", "40代", "50代", "60代以上"],
+                key="age_group_select"
+            )
+            # --- 年代カテゴリーの追加終わり ---
             platform = st.selectbox("媒体", ["Instagram", "GDN", "YDN"], key="platform_select")
             category = st.selectbox("カテゴリ", ["広告", "投稿"] if platform == "Instagram" else ["広告"], key="category_select")
             has_ad_budget = st.selectbox("広告予算", ["あり", "なし"], key="budget_select")
-            purpose = st.selectbox("目的", ["プロフィール誘導", "リンククリック", "保存数増加"], key="purpose_select")
+            
+            # --- 目的に「インプレッション」項目の追加 ---
+            purpose = st.selectbox(
+                "目的",
+                ["プロフィール誘導", "リンククリック", "保存数増加", "インプレッション増加"],
+                key="purpose_select"
+            )
+            # --- 目的に「インプレッション」項目の追加終わり ---
 
         with st.expander("🎯 詳細設定", expanded=True):
             industry = st.selectbox("業種", ["美容", "飲食", "不動産", "子ども写真館", "その他"], key="industry_select")
@@ -247,12 +261,11 @@ with col1:
 
         # --- A Pattern Processing ---
         if uploaded_file_a:
-            # Columns for image and results side-by-side
-            img_col_a, result_col_a = st.columns([1, 2]) # Image 1 part, results 2 parts
+            img_col_a, result_col_a = st.columns([1, 2])
 
             with img_col_a:
-                st.image(Image.open(uploaded_file_a), caption="Aパターン画像", use_container_width=True) # use_container_widthでカラム幅に合わせる
-                if st.button("🚀 Aパターンを採点", key="score_a_btn"): # Changed button name
+                st.image(Image.open(uploaded_file_a), caption="Aパターン画像", use_container_width=True)
+                if st.button("🚀 Aパターンを採点", key="score_a_btn"):
                     image_a = Image.open(uploaded_file_a)
                     buf_a = io.BytesIO()
                     image_a.save(buf_a, format="PNG")
@@ -260,20 +273,38 @@ with col1:
 
                     with st.spinner("AIがAパターンを採点中です..."):
                         try:
+                            # --- AIプロンプトに年代と目的を追加 ---
+                            ai_prompt_text = f"""
+以下のバナー画像をプロ視点で採点してください。
+この広告のターゲット年代は「{age_group}」で、主な目的は「{purpose}」です。
+
+【評価基準】
+1. 内容が一瞬で伝わるか
+2. コピーの見やすさ
+3. 行動喚起
+4. 写真とテキストの整合性
+5. 情報量のバランス
+
+【ターゲット年代「{age_group}」と目的「{purpose}」を考慮した具体的なフィードバックをお願いします。】
+
+【出力形式】
+---
+スコア：{score_format}
+改善コメント：2～3行でお願いします
+---"""
                             response_a = client.chat.completions.create(
                                 model="gpt-4o",
                                 messages=[
                                     {"role": "system", "content": "あなたは広告のプロです。"},
                                     {"role": "user", "content": [
-                                        {"type": "text", "text":
-                                            f"以下のバナー画像をプロ視点で採点してください。\n\n【評価基準】\n1. 内容が一瞬で伝わるか\n2. コピーの見やすさ\n3. 行動喚起\n4. 写真とテキストの整合性\n5. 情報量のバランス\n\n【出力形式】\n---\nスコア：{score_format}\n改善コメント：2～3行でお願いします\n---"},
+                                        {"type": "text", "text": ai_prompt_text},
                                         {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str_a}"}}
                                     ]}
                                 ],
                                 max_tokens=600
                             )
                             content_a = response_a.choices[0].message.content
-                            st.session_state.ai_response_a = content_a # Save raw AI response
+                            st.session_state.ai_response_a = content_a
 
                             score_match_a = re.search(r"スコア[:：]\s*(.+)", content_a)
                             comment_match_a = re.search(r"改善コメント[:：]\s*(.+)", content_a)
@@ -287,6 +318,8 @@ with col1:
                                 "platform": sanitize(platform),
                                 "category": sanitize(category),
                                 "industry": sanitize(industry),
+                                "age_group": sanitize(age_group), # スプレッドシート記録データに追加
+                                "purpose": sanitize(purpose),       # スプレッドシート記録データに追加
                                 "score": sanitize(st.session_state.score_a),
                                 "comment": sanitize(st.session_state.comment_a),
                                 "result": sanitize(result_input),
@@ -296,7 +329,6 @@ with col1:
                             try:
                                 response_gas_a = requests.post(GAS_URL, json=data_a)
                                 if response_gas_a.status_code == 200:
-                                    # st.success("📊 スプレッドシートに記録しました！（Aパターン）") # Hide success message
                                     pass
                                 else:
                                     st.error(f"❌ スプレッドシート送信エラー（Aパターン）: ステータスコード {response_gas_a.status_code}, 応答: {response_gas_a.text}")
@@ -313,17 +345,14 @@ with col1:
                             
                     st.success("Aパターンの診断が完了しました！")
             
-            # Display results outside the button's if block to persist on re-runs
-            with result_col_a: # Column for results display
-                if st.session_state.score_a: # Only display if score is available
+            with result_col_a:
+                if st.session_state.score_a:
                     st.markdown("### ✨ Aパターン診断結果")
                     st.metric("総合スコア", st.session_state.score_a)
                     st.info(f"**改善コメント:** {st.session_state.comment_a}")
                     
                     if industry in ["美容", "健康", "医療"]:
                         with st.spinner("⚖️ 薬機法チェックを実行中（Aパターン）..."):
-                            # Note: Current Yakujiho check is against AI's improvement comments.
-                            # For checking actual ad copy, a separate input field for ad copy would be needed.
                             yakujihou_prompt_a = f"""
 以下の広告文（改善コメント）が薬機法に違反していないかをチェックしてください。
 ※これはバナー画像の内容に対するAIの改善コメントであり、実際の広告文ではありません。
@@ -356,27 +385,45 @@ with col1:
 
         st.markdown("---")
 
-        # --- B Pattern Processing --- (Similar changes as A pattern applied)
+        # --- B Pattern Processing ---
         if uploaded_file_b:
-            img_col_b, result_col_b = st.columns([1, 2]) # Image 1 part, results 2 parts
+            img_col_b, result_col_b = st.columns([1, 2])
 
             with img_col_b:
                 st.image(Image.open(uploaded_file_b), caption="Bパターン画像", use_container_width=True)
-                if st.button("🚀 Bパターンを採点", key="score_b_btn"): # Changed button name
-                    image_b = Image.open(uploaded_file_b) # Corrected to Image.open
+                if st.button("🚀 Bパターンを採点", key="score_b_btn"):
+                    image_b = Image.open(uploaded_file_b)
                     buf_b = io.BytesIO()
                     image_b.save(buf_b, format="PNG")
                     img_str_b = base64.b64encode(buf_b.getvalue()).decode()
 
                     with st.spinner("AIがBパターンを採点中です..."):
                         try:
+                            # --- AIプロンプトに年代と目的を追加 ---
+                            ai_prompt_text = f"""
+以下のバナー画像をプロ視点で採点してください。
+この広告のターゲット年代は「{age_group}」で、主な目的は「{purpose}」です。
+
+【評価基準】
+1. 内容が一瞬で伝わるか
+2. コピーの見やすさ
+3. 行動喚起
+4. 写真とテキストの整合性
+5. 情報量のバランス
+
+【ターゲット年代「{age_group}」と目的「{purpose}」を考慮した具体的なフィードバックをお願いします。】
+
+【出力形式】
+---
+スコア：{score_format}
+改善コメント：2～3行でお願いします
+---"""
                             response_b = client.chat.completions.create(
                                 model="gpt-4o",
                                 messages=[
                                     {"role": "system", "content": "あなたは広告のプロです。"},
                                     {"role": "user", "content": [
-                                        {"type": "text", "text":
-                                            f"以下のバナー画像をプロ視点で採点してください。\n\n【評価基準】\n1. 内容が一瞬で伝わるか\n2. コピーの見やすさ\n3. 行動喚起\n4. 写真とテキストの整合性\n5. 情報量のバランス\n\n【出力形式】\n---\nスコア：{score_format}\n改善コメント：2～3行でお願いします\n---"},
+                                        {"type": "text", "text": ai_prompt_text},
                                         {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str_b}"}}
                                     ]}
                                 ],
@@ -387,7 +434,7 @@ with col1:
 
                             score_match_b = re.search(r"スコア[:：]\s*(.+)", content_b)
                             comment_match_b = re.search(r"改善コメント[:：]\s*(.+)", content_b)
-                            st.session_state.score_b = score_match_b.group(1).strip() if score_match_b else "取得できず" # Corrected from comment_match_b to score_match_b
+                            st.session_state.score_b = score_match_b.group(1).strip() if score_match_b else "取得できず"
                             st.session_state.comment_b = comment_match_b.group(1).strip() if comment_match_b else "取得できず"
 
                             # --- AUTOMATICALLY RECORD TO SPREADSHEET AFTER SCORING ---
@@ -397,6 +444,8 @@ with col1:
                                 "platform": sanitize(platform),
                                 "category": sanitize(category),
                                 "industry": sanitize(industry),
+                                "age_group": sanitize(age_group), # スプレッドシート記録データに追加
+                                "purpose": sanitize(purpose),       # スプレッドシート記録データに追加
                                 "score": sanitize(st.session_state.score_b),
                                 "comment": sanitize(st.session_state.comment_b),
                                 "result": sanitize(result_input),
@@ -406,7 +455,6 @@ with col1:
                             try:
                                 response_gas_b = requests.post(GAS_URL, json=data_b)
                                 if response_gas_b.status_code == 200:
-                                    # st.success("📊 スプレッドシートに記録しました！（Bパターン）") # Hide success message
                                     pass
                                 else:
                                     st.error(f"❌ スプレッドシート送信エラー（Bパターン）: ステータスコード {response_gas_b.status_code}, 応答: {response_gas_b.text}")
@@ -423,8 +471,8 @@ with col1:
                     
                     st.success("Bパターンの診断が完了しました！")
 
-            with result_col_b: # Column for results display
-                if st.session_state.score_b: # Only display if score is available
+            with result_col_b:
+                if st.session_state.score_b:
                     st.markdown("### ✨ Bパターン診断結果")
                     st.metric("総合スコア", st.session_state.score_b)
                     st.info(f"**改善コメント:** {st.session_state.comment_b}")
