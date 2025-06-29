@@ -4,23 +4,9 @@ import io
 import os
 import re
 import requests
-from PIL import Image # PIL (Pillow) のインポートはロゴ表示のために必要
+from PIL import Image
 from datetime import datetime
 from openai import OpenAI
-
-# --- ロゴの表示 (ここから追加) ---
-# ロゴ画像のパス
-# あなたが保存したロゴのファイル名に合わせる
-logo_path = "banasuko_logo_icon.png"
-
-# 画像ファイルを読み込み、サイドバーに表示
-try:
-    logo_image = Image.open(logo_path)
-    st.sidebar.image(logo_image, use_column_width=True) # サイドバーの幅に合わせて表示
-except FileNotFoundError:
-    st.sidebar.error(f"ロゴ画像 '{logo_path}' が見つかりません。ファイルが正しく配置されているか確認してください。")
-# --- ロゴの表示 (ここまで追加) ---
-
 
 # OpenAI APIキーの読み込み
 openai_api_key = os.getenv("OPENAI_API_KEY")
@@ -30,8 +16,6 @@ if not openai_api_key:
 client = OpenAI(api_key=openai_api_key)
 
 # GASとGoogle Driveの情報
-# Replace with your deployed GAS URL
-# It's strongly recommended to use your latest deployed GAS URL
 GAS_URL = "https://script.google.com/macros/s/AKfycbxUy3JI5xwncRHxv-WoHHNqiF7LLndhHTOzmLOHtNRJ2hNCo8PJi7-0fdbDjnfAGMlL/exec"
 
 # Helper function to sanitize values
@@ -46,146 +30,145 @@ def sanitize(value):
 # Streamlit UI configuration
 st.set_page_config(layout="wide", page_title="バナスコAI")
 
-# --- カスタムCSSの追加 ---
+# --- カスタムCSSの追加 (Newpeace デザインに合わせた明るいテーマ) ---
 st.markdown(
     """
     <style>
-    /* 全体の背景に微細なグリッドパターンとグラデーション */
+    /* 全体の背景色を白基調に */
     body {
-        background: radial-gradient(circle at top left, #1a1a1a, #0a0a0a);
-        background-repeat: repeat;
-        background-size: 20px 20px;
-        background-image: 
-            linear-gradient(to right, #2a2a2a 1px, transparent 1px),
-            linear-gradient(to bottom, #2a2a2a 1px, transparent 1px);
-        background-attachment: fixed;
+        background-color: #FFFFFF; /* config.tomlのbackgroundColorと一致させる */
+        /* 背景パターンは削除、またはごく薄いパターンに変更 */
+        background-image: none; 
     }
 
-    /* Streamlitのメインコンテナに影と少しの角丸 */
+    /* Streamlitのメインコンテナに影と角丸 */
     .main .block-container {
         padding-top: 2rem;
         padding-right: 2rem;
         padding-left: 2rem;
         padding-bottom: 2rem;
-        border-radius: 8px; /* 少し角丸 */
-        box-shadow: 0px 4px 15px rgba(0, 229, 118, 0.2); /* primaryColorのシャドウ */
-        background-color: #1a1a1a; /* main background to match */
+        border-radius: 12px; /* 少し大きめの角丸でモダンに */
+        box-shadow: 0px 8px 20px rgba(0, 0, 0, 0.08); /* 柔らかい影 */
+        background-color: #FFFFFF; /* メインコンテナの背景も白 */
     }
 
     /* サイドバーの背景色をテーマに合わせて調整 */
     .stSidebar {
-        background-color: #1E1E1E; /* secondaryBackgroundColorに合わせる */
-        border-right: 1px solid #333;
+        background-color: #F0F0F0; /* secondaryBackgroundColorに合わせる */
+        border-right: none; /* ボーダー削除でクリーンに */
+        box-shadow: 2px 0px 10px rgba(0, 0, 0, 0.05); /* サイドバーに影 */
     }
     
-    /* ボタンのスタイル調整（よりシャープに、アクティブ感を出す） */
+    /* ボタンのスタイル調整 */
     .stButton > button {
-        background-color: #008040; /* primaryColorより少し暗め */
+        background-color: #0000FF; /* primaryColor (鮮やかな青) */
         color: white;
-        border-radius: 5px;
-        border: 1px solid #00E676; /* primaryColorのボーダー */
-        box-shadow: 0px 2px 5px rgba(0, 229, 118, 0.2);
+        border-radius: 8px; /* 角丸を少し大きく */
+        border: none; /* ボーダー削除 */
+        box-shadow: 0px 4px 10px rgba(0, 0, 255, 0.2); /* 青い影 */
         transition: background-color 0.2s, box-shadow 0.2s;
+        font-weight: bold; /* フォントを太く */
     }
     .stButton > button:hover {
-        background-color: #00B359; /* ホバーで少し明るく */
-        box-shadow: 0px 4px 10px rgba(0, 229, 118, 0.4);
+        background-color: #3333FF; /* ホバーで少し明るい青 */
+        box-shadow: 0px 6px 15px rgba(0, 0, 255, 0.3);
     }
     .stButton > button:active {
-        background-color: #006633; /* クリック時にさらに暗く */
+        background-color: #0000CC; /* クリック時に少し暗い青 */
         box-shadow: none;
     }
 
-    /* Expanderのボーダーと背景（メカニックなコンポーネント感を出す） */
+    /* Expanderのスタイル調整 */
     .stExpander {
-        border: 1px solid #333;
-        border-radius: 5px;
-        background-color: #282828; /* 少し明るい背景で目立たせる */
-        box-shadow: 0px 1px 3px rgba(0,0,0,0.3);
+        border: 1px solid #E0E0E0; /* 薄いグレーのボーダー */
+        border-radius: 8px;
+        background-color: #FFFFFF; /* 背景を白に */
+        box-shadow: 0px 2px 5px rgba(0,0,0,0.05); /* 柔らかい影 */
     }
     .stExpander > div > div { /* ヘッダー部分 */
-        background-color: #333;
-        border-bottom: 1px solid #444;
-        border-top-left-radius: 5px;
-        border-top-right-radius: 5px;
+        background-color: #F8F8F8; /* secondaryBackgroundColorに合わせる */
+        border-bottom: 1px solid #E0E0E0;
+        border-top-left-radius: 8px;
+        border-top-right-radius: 8px;
     }
     .stExpanderDetails { /* 展開される内容部分 */
-        background-color: #282828; /* Expander本体と同じ */
+        background-color: #FFFFFF; /* Expander本体と同じ */
     }
 
-    /* テキスト入力、セレクトボックスなどの背景 */
+    /* テキスト入力、セレクトボックスなどのスタイル */
     div[data-baseweb="input"],
     div[data-baseweb="select"],
     div[data-baseweb="textarea"] {
-        background-color: #333333;
-        border-radius: 5px;
-        border: 1px solid #555555;
-        color: #E0E0E0;
+        background-color: #FFFFFF; /* 背景を白に */
+        border-radius: 8px;
+        border: 1px solid #E0E0E0; /* 薄いグレーのボーダー */
+        color: #333333; /* テキスト色を暗く */
+        box-shadow: inset 0px 1px 3px rgba(0,0,0,0.05); /* わずかな内側の影 */
     }
     /* テキスト入力、セレクトボックスなどのテキスト色 */
     div[data-baseweb="input"] input,
     div[data-baseweb="select"] span,
     div[data-baseweb="textarea"] textarea {
-        color: #E0E0E0 !important;
+        color: #333333 !important; /* テキスト色を暗く */
     }
     div[data-baseweb="input"]:focus-within,
     div[data-baseweb="select"]:focus-within,
     div[data-baseweb="textarea"]:focus-within {
-        border-color: #00E676; /* フォーカス時にアクセントカラー */
-        box-shadow: 0 0 0 1px #00E676;
+        border-color: #0000FF; /* フォーカス時にアクセントカラー（青） */
+        box-shadow: 0 0 0 2px rgba(0, 0, 255, 0.3); /* 青い影 */
     }
 
     /* メトリック (st.metric) の表示を強調 */
     [data-testid="stMetricValue"] {
-        color: #00E676; /* アクセントカラー */
-        font-size: 2.5rem; /* 大きめのフォントサイズ */
+        color: #FFD700; /* 鮮やかな黄色 (Newpeaceの黄色をイメージ) */
+        font-size: 2.5rem;
         font-weight: bold;
     }
     [data-testid="stMetricLabel"] {
-        color: #B0B0B0;
+        color: #666666; /* 少し暗めのラベル色 */
         font-size: 0.9rem;
     }
     [data-testid="stMetricDelta"] {
-        color: #E0E0E0; /* デルタ（変化量）のテキスト色 */
+        color: #333333; /* デルタ（変化量）のテキスト色 */
     }
 
     /* Infoボックスの強調 */
     .stAlert.stAlert-info {
-        background-color: #00331A; /* primaryColorの暗いバージョン */
-        border-left: 5px solid #00E676;
-        color: #E0E0E0;
+        background-color: #E0EFFF; /* 薄い青 */
+        border-left: 5px solid #0000FF; /* 濃い青のボーダー */
+        color: #333333;
     }
 
     /* Successボックスの強調 */
     .stAlert.stAlert-success {
-        background-color: #1a4d2e; /* より深いグリーン */
-        border-left: 5px solid #00E676;
-        color: #E0E0E0;
+        background-color: #E0FFE0; /* 薄い緑 */
+        border-left: 5px solid #00AA00; /* 標準的な緑 */
+        color: #333333;
     }
 
     /* Warningボックスの強調 */
     .stAlert.stAlert-warning {
-        background-color: #4d401a; /* オレンジ系の警告色 */
-        border-left: 5px solid #FFC107;
-        color: #E0E0E0;
+        background-color: #FFFBE0; /* 薄い黄色 */
+        border-left: 5px solid #FFD700; /* 鮮やかな黄色 */
+        color: #333333;
     }
 
     /* Errorボックスの強調 */
     .stAlert.stAlert-error {
-        background-color: #4d1a1a; /* 赤系のエラー色 */
-        border-left: 5px solid #DC3545;
-        color: #E0E0E0;
+        background-color: #FFE0E0; /* 薄い赤 */
+        border-left: 5px solid #FF0000; /* 鮮やかな赤 */
+        color: #333333;
     }
 
     /* コードブロックの背景 */
     code {
-        background-color: #2a2a2a !important;
-        color: #00E676 !important; /* コードのテキスト色もアクセントカラーに */
+        background-color: #F0F0F0 !important; /* 明るいコード背景 */
+        color: #000080 !important; /* 少し濃い青のコードテキスト */
         border-radius: 5px;
         padding: 0.2em 0.4em;
     }
     pre code {
-        background-color: #2a2a2a !important;
+        background-color: #F0F0F0 !important;
         padding: 1em !important;
         overflow-x: auto;
     }
