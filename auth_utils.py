@@ -1,8 +1,7 @@
-
 # auth_utils.py
 import streamlit as st
 import os
-import pyrebase4
+import pyrebase # ✅ 修正: pyrebase4 から pyrebase に変更
 from dotenv import load_dotenv
 
 # .envファイルから環境変数を読み込む
@@ -22,7 +21,7 @@ firebaseConfig = {
 # Firebaseを初期化
 # 初期化が成功したかどうかをセッションステートに保存
 try:
-    firebase = pyrebase4.initialize_app(firebaseConfig)
+    firebase = pyrebase.initialize_app(firebaseConfig) # ✅ 修正: pyrebase4 から pyrebase に変更
     auth = firebase.auth()
     if "firebase_initialized" not in st.session_state:
         st.session_state.firebase_initialized = True
