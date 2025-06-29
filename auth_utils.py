@@ -1,251 +1,584 @@
-# auth_utils.py
 import streamlit as st
+import base64
+import io
 import os
+import re
 import requests
-from dotenv import load_dotenv
-# firebase_admin は使用しないため、インポートを削除
-# import firebase_admin
-# from firebase_admin import credentials, firestore
-# jsonモジュールも不要になる
-# import json
+from PIL import Image
+from datetime import datetime
+from openai import OpenAI
 
-# .envファイルから環境変数を読み込む
-load_dotenv()
-
-# Firebase Authentication REST APIに必要なAPIキーを取得
-FIREBASE_API_KEY = os.getenv("FIREBASE_API_KEY")
-
-if not FIREBASE_API_KEY:
-    st.error("Firebase APIキーが.envファイルに見つかりません。")
-    st.stop()
-
-# Firebase Authentication REST APIのエンドポイントベースURL
-FIREBASE_AUTH_BASE_URL = "https://identitytoolkit.googleapis.com/v1/accounts:"
-# Firestore REST APIのエンドポイントベースURL
-# プロジェクトIDが別途必要
-FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID") # .envに設定されているはず
-
-if not FIREBASE_PROJECT_ID:
-    st.error("FirebaseプロジェクトIDが.envファイルに見つかりません。")
-    st.stop()
-
-FIREBASE_FIRESTORE_BASE_URL = f"https://firestore.googleapis.com/v1/projects/{FIREBASE_PROJECT_ID}/databases/(default)/documents/"
+import auth_utils # ✅ auth_utils.py をインポート
 
 
-# Streamlitのセッションステートを初期化 (初回ロード時のみ)
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-if "user" not in st.session_state:
-    st.session_state.user = None
-if "email" not in st.session_state:
-    st.session_state.email = None
-if "plan" not in st.session_state:
-    st.session_state.plan = "Guest"
-if "remaining_uses" not in st.session_state:
-    st.session_state.remaining_uses = 0
-if "firebase_initialized" not in st.session_state: # Auth APIのみ使うため、初期化は成功とみなす
-    st.session_state.firebase_initialized = True
+# GASとGoogle Driveの情報
+# Replace with your deployed GAS URL
+# It's strongly recommended to use your latest deployed GAS URL
+GAS_URL = "https://script.google.com/macros/s/AKfycbxUy3JI5xwncRHxv-WoHHNqiF7LLndhHTOzmLOHtNRJ2hNCo8PJi7-0fdbDjnfAGMlL/exec"
+
+# Helper function to sanitize values
+def sanitize(value):
+    """Replaces None or specific strings with 'エラー' (Error)"""
+    if value is None or value == "取得できず":
+        return "エラー"
+    return value
+
+# Google Drive upload functionality is removed in this version
 
 
-# --- Firebase Authentication REST APIの関数 ---
-def sign_in_with_email_and_password(email, password):
-    url = f"{FIREBASE_AUTH_BASE_URL}signInWithPassword?key={FIREBASE_API_KEY}"
-    headers = {"Content-Type": "application/json"}
-    data = {
-        "email": email,
-        "password": password,
-        "returnSecureToken": True
-    }
-    response = requests.post(url, headers=headers, json=data)
-    response.raise_for_status()
-    return response.json()
+# Streamlit UI configuration
+st.set_page_config(layout="wide", page_title="バナスコAI")
 
-def create_user_with_email_and_password(email, password):
-    url = f"{FIREBASE_AUTH_BASE_URL}signUp?key={FIREBASE_API_KEY}"
-    headers = {"Content-Type": "application/json"}
-    data = {
-        "email": email,
-        "password": password,
-        "returnSecureToken": True
-    }
-    response = requests.post(url, headers=headers, json=data)
-    response.raise_for_status()
-    return response.json()
+# --- ロゴの表示 ---
+# ロゴ画像のパス
+logo_path = "banasuko_logo_icon.png"
+
+# 画像ファイルを読み込み、サイドバーに表示
+try:
+    logo_image = Image.open(logo_path)
+    st.sidebar.image(logo_image, use_container_width=True) # サイドバーの幅に合わせて表示
+except FileNotFoundError:
+    st.sidebar.error(f"ロゴ画像 '{logo_path}' が見つかりません。ファイルが正しく配置されているか確認してください。")
+
+# --- ログインチェックを実行 ---
+# これが最も重要！この行より下は、ログイン済みの場合にのみ実行されます
+auth_utils.check_login() # ✅ 認証ユーティリティを呼び出し
 
 
-# --- Firestore REST APIの操作関数 ---
-# 注意: Firestore REST APIで直接書き込む場合、Security Rulesが非常に重要になります。
-# 適切に設定しないと誰でもデータにアクセス・変更できてしまいます。
-# ここでは、ログインユーザー本人しか自分のドキュメントを読み書きできないようにする Security Rulesを後で提示します。
-def get_user_data_from_firestore_rest(uid):
-    """Firestore REST APIからユーザーのプランと利用回数を取得する"""
-    url = f"{FIREBASE_FIRESTORE_BASE_URL}users/{uid}?key={FIREBASE_API_KEY}"
-    response = requests.get(url)
-    
-    if response.status_code == 200:
-        doc_data = response.json()
-        if "fields" in doc_data:
-            # Firestoreから取得したフィールドはネストされているのでパース
-            st.session_state.plan = doc_data["fields"].get("plan", {}).get("stringValue", "Free")
-            st.session_state.remaining_uses = int(doc_data["fields"].get("remaining_uses", {}).get("integerValue", 0))
-            return True
-        else:
-            # ドキュメントが存在しない場合（新規作成されたばかりのユーザー）
-            st.session_state.plan = "Free"
-            st.session_state.remaining_uses = 5 # デフォルトの無料回数
-            # Firestoreに新規ドキュメントを作成 (create_user_firestore_rest関数を呼び出す)
-            create_user_firestore_rest(uid, st.session_state.email, st.session_state.plan, st.session_state.remaining_uses)
-            return True
-    elif response.status_code == 404: # ドキュメントが存在しない
-        st.session_state.plan = "Free"
-        st.session_state.remaining_uses = 5 # デフォルトの無料回数
-        create_user_firestore_rest(uid, st.session_state.email, st.session_state.plan, st.session_state.remaining_uses)
-        return True
-    else:
-        st.error(f"Firestoreデータ取得エラー: {response.status_code} - {response.text}")
-        return False
-
-def create_user_firestore_rest(uid, email, plan, remaining_uses):
-    """Firestore REST APIで新規ユーザーのドキュメントを作成する"""
-    url = f"{FIREBASE_FIRESTORE_BASE_URL}users?documentId={uid}&key={FIREBASE_API_KEY}"
-    headers = {"Content-Type": "application/json"}
-    data = {
-        "fields": {
-            "email": {"stringValue": email},
-            "plan": {"stringValue": plan},
-            "remaining_uses": {"integerValue": remaining_uses},
-            "created_at": {"timestampValue": datetime.utcnow().isoformat() + "Z"} # ISO 8601形式
-        }
-    }
-    response = requests.post(url, headers=headers, json=data)
-    response.raise_for_status() # HTTPエラーが発生した場合に例外を発生させる
-    return response.json()
-
-def update_user_uses_in_firestore_rest(uid, uses_to_deduct=1):
-    """Firestore REST APIでユーザーの利用回数を減らす"""
-    # 現在の残り回数を取得して、そこから減算する方式
-    # Firestore REST APIのincrementは複雑なので、読み書き方式にする
-    
-    # まず現在の残り回数を取得
-    url_get = f"{FIREBASE_FIRESTORE_BASE_URL}users/{uid}?key={FIREBASE_API_KEY}"
-    get_response = requests.get(url_get)
-    get_response.raise_for_status()
-    current_data = get_response.json()["fields"]
-    
-    current_uses = int(current_data.get("remaining_uses", {}).get("integerValue", 0))
-    new_uses = current_uses - uses_to_deduct
-
-    # 更新するフィールドだけを指定 (PATCH)
-    url_patch = f"{FIREBASE_FIRESTORE_BASE_URL}users/{uid}?updateMask.fieldPaths=remaining_uses&updateMask.fieldPaths=last_used_at&key={FIREBASE_API_KEY}"
-    headers = {"Content-Type": "application/json"}
-    data = {
-        "fields": {
-            "remaining_uses": {"integerValue": new_uses},
-            "last_used_at": {"timestampValue": datetime.utcnow().isoformat() + "Z"}
-        }
-    }
-    response = requests.patch(url_patch, headers=headers, json=data)
-    response.raise_for_status() # HTTPエラーが発生した場合に例外を発生させる
-    
-    st.session_state.remaining_uses = new_uses # セッションステートも更新
-    st.sidebar.write(f"残り回数: {st.session_state.remaining_uses}回 ({st.session_state.plan}プラン)")
-    return True
-    
-# --- StreamlitのUI表示と認証フロー ---
-def login_page():
-    """Streamlit上にログイン画面を表示する関数"""
-    st.title("🔐 バナスコAI ログイン")
-    st.markdown("アカウント情報入力フォームの機能を利用するにはログインが必要です。")
-
-    email = st.text_input("メールアドレス", key="login_email")
-    password = st.text_input("パスワード", type="password", key="login_password")
-
-    login_col, create_col = st.columns(2)
-
-    with login_col:
-        if st.button("ログイン", key="login_button"):
-            with st.spinner("ログイン中..."):
-                try:
-                    user_info = sign_in_with_email_and_password(email, password)
-                    st.session_state["user"] = user_info["localId"]
-                    st.session_state["email"] = user_info["email"]
-                    st.session_state["logged_in"] = True
-                    
-                    # ログイン成功時、Firestoreからユーザーデータを読み込む
-                    get_user_data_from_firestore_rest(st.session_state["user"])
-
-                    st.success(f"ログインしました: {user_info['email']}")
-                    st.rerun() # ログイン後、アプリを再実行してメインコンテンツを表示
-                except requests.exceptions.HTTPError as e:
-                    error_json = e.response.json()
-                    error_code = error_json.get("error", {}).get("message", "Unknown error")
-                    if error_code == "EMAIL_NOT_FOUND" or error_code == "INVALID_PASSWORD":
-                        st.error("ログインに失敗しました。メールアドレスまたはパスワードが間違っています。")
-                    elif error_code == "USER_DISABLED":
-                        st.error("このアカウントは無効化されています。")
-                    else:
-                        st.error(f"ログイン中にエラーが発生しました: {error_code}")
-                        # st.error(error_json) # デバッグ用
-                except Exception as e:
-                    st.error(f"予期せぬエラーが発生しました: {e}")
-
-    with create_col:
-        if st.button("アカウント作成", key="create_account_button"):
-            with st.spinner("アカウント作成中..."):
-                try:
-                    user_info = create_user_with_email_and_password(email, password)
-                    
-                    # アカウント作成成功時、Firestoreに新規ユーザーデータを書き込む
-                    # ログイン時にget_user_data_from_firestore_restで自動作成されるため、ここでは何もしない
-                    
-                    st.success(f"アカウント '{user_info['email']}' を作成しました。ログインしてください。")
-                except requests.exceptions.HTTPError as e:
-                    error_json = e.response.json()
-                    error_code = error_json.get("error", {}).get("message", "Unknown error")
-                    if error_code == "EMAIL_EXISTS":
-                        st.error("このメールアドレスは既に使用されています。")
-                    elif error_code == "WEAK_PASSWORD":
-                        st.error("パスワードが弱すぎます（6文字以上必要）。")
-                    else:
-                        st.error(f"アカウント作成中にエラーが発生しました: {error_code}")
-                        # st.error(error_json) # デバッグ用
-                except Exception as e:
-                    st.error(f"予期せぬエラーが発生しました: {e}")
-
-def logout():
-    """ユーザーをログアウトさせる関数"""
-    if st.session_state.get("logged_in"):
-        keys_to_clear = ["user", "email", "logged_in", "plan", "remaining_uses",
-                         "score_a", "comment_a", "yakujihou_a", "score_b", "comment_b", "yakujihou_b",
-                         "ai_response_a", "ai_response_b"]
-        for key in keys_to_clear:
-            if key in st.session_state:
-                del st.session_state[key]
-        st.success("ログアウトしました。")
-        st.rerun() # ログアウト後、アプリを再実行してログイン画面に戻る
-
-def check_login():
+# --- カスタムCSSの追加 (背景色を完全に白に固定 & Newpeace デザインに合わせた明るいテーマ) ---
+st.markdown(
     """
-    ユーザーのログイン状態をチェックし、未ログインならログインページを表示してアプリの実行を停止する。
-    Firestoreの残り回数も確認し、サイドバーに表示する。
-    """
-    # このバージョンではAdmin SDKの初期化は不要になったため、このチェックは不要または簡略化
-    # st.session_state.firebase_initialized は常にTrueになる想定
-    # if not st.session_state.get("firebase_initialized"):
-    #     st.stop() 
+    <style>
+    /* 全体の背景色を強制的に白に設定 */
+    body {
+        background-color: #FFFFFF !important;
+        background-image: none !important; /* 念のため、背景画像も無効化 */
+    }
 
-    # サイドバーに現在のユーザー名とログアウトボタン、残り回数を配置
-    if st.session_state.get("logged_in"):
-        st.sidebar.write(f"ようこそ, {st.session_state.get('email')}!")
-        
-        # ログイン済みだが残り回数がまだ読み込まれていない場合、読み込む
-        if "remaining_uses" not in st.session_state or st.session_state.remaining_uses is None:
-            get_user_data_from_firestore_rest(st.session_state["user"])
-        
-        st.sidebar.write(f"残り回数: {st.session_state.remaining_uses}回 ({st.session_state.plan}プラン)")
-        st.sidebar.button("ログアウト", on_click=logout)
+    /* Streamlitのメインコンテナ */
+    .main .block-container {
+        background-color: #FFFFFF; /* メインコンテナの背景も白 */
+        padding-top: 2rem;
+        padding-right: 2rem;
+        padding-left: 2rem;
+        padding-bottom: 2rem;
+        border-radius: 12px; /* 少し大きめの角丸でモダンに */
+        box-shadow: 0px 8px 20px rgba(0, 0, 0, 0.08); /* 柔らかい影 */
+    }
 
-    # ログインしていない場合は、ログインページを表示してアプリの実行を停止
-    if not st.session_state.get("logged_in"):
-        login_page()
-        st.stop() # ここでメインアプリの実行を停止
+    /* サイドバー */
+    .stSidebar {
+        background-color: #F8F8F8; /* 少し明るいグレー */
+        border-right: none;
+        box-shadow: 2px 0px 10px rgba(0, 0, 0, 0.05);
+    }
+
+    /* ボタン */
+    .stButton > button {
+        background-color: #0000FF; /* primaryColor (鮮やかな青) */
+        color: white;
+        border-radius: 8px; /* 角丸を少し大きく */
+        border: none;
+        box-shadow: 0px 4px 10px rgba(0, 0, 255, 0.2); /* 青い影 */
+        transition: background-color 0.2s, box-shadow 0.2s;
+        font-weight: bold;
+    }
+    .stButton > button:hover {
+        background-color: #3333FF;
+        box-shadow: 0px 6px 15px rgba(0, 0, 255, 0.3);
+    }
+    .stButton > button:active {
+        background-color: #0000CC;
+        box-shadow: none;
+    }
+
+    /* Expander */
+    .stExpander {
+        border: 1px solid #E0E0E0;
+        border-radius: 8px;
+        background-color: #FFFFFF;
+        box-shadow: 0px 2px 5px rgba(0,0,0,0.05);
+    }
+    .stExpander > div > div {
+        background-color: #F8F8F8;
+        border-bottom: 1px solid #E0E0E0;
+        border-top-left-radius: 8px;
+        border-top-right-radius: 8px;
+    }
+    .stExpanderDetails {
+        background-color: #FFFFFF;
+    }
+
+    /* テキスト入力、セレクトボックスなど */
+    div[data-baseweb="input"] input,
+    div[data-baseweb="select"] span,
+    div[data-baseweb="textarea"] textarea,
+    .stSelectbox .st-bv, /* Selectbox display value */
+    .stTextInput .st-eb, /* Text input display */
+    .stTextArea .st-eb /* Textarea display */
+    {
+        background-color: #FFFFFF !important;
+        color: #333333 !important;
+        border-radius: 8px;
+        border: 1px solid #E0E0E0;
+        box-shadow: inset 0px 1px 3px rgba(0,0,0,0.05);
+    }
+    /* フォーカス時のスタイル */
+    div[data-baseweb="input"] input:focus,
+    div[data-baseweb="select"] span:focus,
+    div[data-baseweb="textarea"] textarea:focus,
+    div[data-baseweb="input"]:focus-within,
+    div[data-baseweb="select"]:focus-within,
+    div[data-baseweb="textarea"]:focus-within {
+        border-color: #0000FF;
+        box-shadow: 0 0 0 2px rgba(0, 0, 255, 0.3);
+    }
+
+    /* メトリック */
+    [data-testid="stMetricValue"] {
+        color: #FFD700; /* 鮮やかな黄色 (Newpeaceの黄色をイメージ) */
+        font-size: 2.5rem;
+        font-weight: bold;
+    }
+    [data-testid="stMetricLabel"] {
+        color: #666666;
+        font-size: 0.9rem;
+    }
+    [data-testid="stMetricDelta"] {
+        color: #333333;
+    }
+
+    /* Info, Success, Warning, Errorボックス */
+    .stAlert {
+        color: #333333;
+    }
+    .stAlert.stAlert-info {
+        background-color: #E0EFFF;
+        border-left-color: #0000FF;
+    }
+    .stAlert.stAlert-success {
+        background-color: #E0FFE0;
+        border-left-color: #00AA00;
+    }
+    .stAlert.stAlert-warning {
+        background-color: #FFFBE0;
+        border-left-color: #FFD700;
+    }
+    .stAlert.stAlert-error {
+        background-color: #FFE0E0;
+        border-left-color: #FF0000;
+    }
+
+    /* コードブロック */
+    code {
+        background-color: #F0F0F0 !important;
+        color: #000080 !important;
+        border-radius: 5px;
+        padding: 0.2em 0.4em;
+    }
+    pre code {
+        background-color: #F0F0F0 !important;
+        padding: 1em !important;
+        overflow-x: auto;
+    }
+
+    /* サイドバーのテキスト色を調整 */
+    .stSidebar [data-testid="stText"],
+    .stSidebar [data-testid="stMarkdownContainer"],
+    .stSidebar .st-emotion-cache-1jm692h {
+        color: #333333;
+    }
+
+    /* セレクトボックスのドロップダウンリストの背景色 */
+    div[data-baseweb="popover"] > div {
+        background-color: #FFFFFF !important;
+        color: #333333 !important;
+    }
+    /* セレクトボックスのドロップダウンリストのアイテムのテキスト色 */
+    div[data-baseweb="popover"] > div > ul > li {
+        color: #333333 !important;
+    }
+    /* セレクトボックスのドロップダウンリストのホバー色 */
+    div[data-baseweb="popover"] > div > ul > li[data-mouse-entered="true"] {
+        background-color: #E0EFFF !important; /* 薄い青 */
+        color: #0000FF !important; /* アクセントの青 */
+    }
+
+
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+# --- カスタムCSSの終わり ---
+
+# --- アプリケーション本体（ログイン済みの場合のみ実行） ---
+st.title("🧠 バナー広告 採点AI - バナスコ")
+st.subheader("〜もう、無駄打ちしない。広告を“武器”に変えるAIツール〜")
+
+col1, col2 = st.columns([2, 1])
+
+with col1:
+    with st.container(border=True):
+        st.subheader("📝 バナー情報入力フォーム")
+
+        with st.expander("👤 基本情報", expanded=True):
+            user_name = st.text_input("ユーザー名", key="user_name_input")
+            age_group = st.selectbox(
+                "ターゲット年代",
+                ["指定なし", "10代", "20代", "30代", "40代", "50代", "60代以上"],
+                key="age_group_select"
+            )
+            platform = st.selectbox("媒体", ["Instagram", "GDN", "YDN"], key="platform_select")
+            category = st.selectbox("カテゴリ", ["広告", "投稿"] if platform == "Instagram" else ["広告"], key="category_select")
+            has_ad_budget = st.selectbox("広告予算", ["あり", "なし"], key="budget_budget_select")
+            
+            purpose = st.selectbox(
+                "目的",
+                ["プロフィール誘導", "リンククリック", "保存数増加", "インプレッション増加"],
+                key="purpose_select"
+            )
+
+        with st.expander("🎯 詳細設定", expanded=True):
+            industry = st.selectbox("業種", ["美容", "飲食", "不動産", "子ども写真館", "その他"], key="industry_select")
+            genre = st.selectbox("ジャンル", ["お客様の声", "商品紹介", "ノウハウ", "世界観", "キャンペーン"], key="genre_select")
+            score_format = st.radio("スコア形式", ["A/B/C", "100点満点"], horizontal=True, key="score_format_radio")
+            ab_pattern = st.radio("ABテストパターン", ["Aパターン", "Bパターン", "該当なし"], horizontal=True, key="ab_pattern_radio")
+            banner_name = st.text_input("バナー名", key="banner_name_input")
+
+        with st.expander("📌 任意項目", expanded=False):
+            result_input = st.text_input("AI評価結果（任意）", help="AIが生成した評価結果を記録したい場合に入力します。", key="result_input_text")
+            follower_gain_input = st.text_input("フォロワー増加数（任意）", help="Instagramなどのフォロワー増加数があれば入力します。", key="follower_gain_input_text")
+            memo_input = st.text_area("メモ（任意）", help="その他、特記事項があれば入力してください。", key="memo_input_area")
+
+        st.markdown("---")
+        st.subheader("🖼️ バナー画像アップロードと診断")
+
+        uploaded_file_a = st.file_uploader("Aパターン画像をアップロード", type=["png", "jpg", "jpeg"], key="a_upload")
+        uploaded_file_b = st.file_uploader("Bパターン画像をアップロード", type=["png", "jpg", "jpeg"], key="b_upload")
+
+        # Initialize session state for results
+        if 'score_a' not in st.session_state: st.session_state.score_a = None
+        if 'comment_a' not in st.session_state: st.session_state.comment_a = None
+        if 'yakujihou_a' not in st.session_state: st.session_state.yakujihou_a = None
+        if 'score_b' not in st.session_state: st.session_state.score_b = None
+        if 'comment_b' not in st.session_state: st.session_state.comment_b = None
+        if 'yakujihou_b' not in st.session_state: st.session_state.yakujihou_b = None
+
+        # --- A Pattern Processing ---
+        if uploaded_file_a:
+            img_col_a, result_col_a = st.columns([1, 2])
+
+            with img_col_a:
+                st.image(Image.open(uploaded_file_a), caption="Aパターン画像", use_container_width=True)
+                if st.button("🚀 Aパターンを採点", key="score_a_btn"):
+                    # ✅ ここから利用回数チェックと消費のロジック
+                    if st.session_state.remaining_uses <= 0:
+                        st.warning(f"残り回数がありません。（{st.session_state.plan}プラン）")
+                        st.info("利用回数を増やすには、プランのアップグレードが必要です。")
+                    else:
+                        # 回数消費の実行
+                        if auth_utils.update_user_uses_in_firestore_rest(st.session_state["user"]):
+                            # 回数消費が成功した場合のみ、AI採点とデータ記録に進む
+                            image_a = Image.open(uploaded_file_a)
+                            buf_a = io.BytesIO()
+                            image_a.save(buf_a, format="PNG")
+                            img_str_a = base64.b64encode(buf_a.getvalue()).decode()
+
+                            with st.spinner("AIがAパターンを採点中です..."):
+                                try:
+                                    ai_prompt_text = f"""
+以下のバナー画像をプロ視点で採点してください。
+この広告のターゲット年代は「{age_group}」で、主な目的は「{purpose}」です。
+
+【評価基準】
+1. 内容が一瞬で伝わるか
+2. コピーの見やすさ
+3. 行動喚起
+4. 写真とテキストの整合性
+5. 情報量のバランス
+
+【ターゲット年代「{age_group}」と目的「{purpose}」を考慮した具体的なフィードバックをお願いします。】
+
+【出力形式】
+---
+スコア：{score_format}
+改善コメント：2～3行でお願いします
+---"""
+                                    response_a = client.chat.completions.create(
+                                        model="gpt-4o",
+                                        messages=[
+                                            {"role": "system", "content": "あなたは広告のプロです。"},
+                                            {"role": "user", "content": [
+                                                {"type": "text", "text": ai_prompt_text},
+                                                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str_a}"}}
+                                            ]}
+                                        ],
+                                        max_tokens=600
+                                    )
+                                    content_a = response_a.choices[0].message.content
+                                    st.session_state.ai_response_a = content_a
+
+                                    score_match_a = re.search(r"スコア[:：]\s*(.+)", content_a)
+                                    comment_match_a = re.search(r"改善コメント[:：]\s*(.+)", content_a)
+                                    st.session_state.score_a = score_match_a.group(1).strip() if score_match_a else "取得できず"
+                                    st.session_state.comment_a = comment_match_a.group(1).strip() if comment_match_a else "取得できず"
+
+                                    # --- AUTOMATICALLY RECORD TO SPREADSHEET AFTER SCORING ---
+                                    data_a = {
+                                        "sheet_name": "record_log",
+                                        "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                        "platform": sanitize(platform),
+                                        "category": sanitize(category),
+                                        "industry": sanitize(industry),
+                                        "age_group": sanitize(age_group),
+                                        "purpose": sanitize(purpose),
+                                        "score": sanitize(st.session_state.score_a),
+                                        "comment": sanitize(st.session_state.comment_a),
+                                        "result": sanitize(result_input),
+                                        "follower_gain": sanitize(follower_gain_input),
+                                        "memo": sanitize(memo_input),
+                                    }
+                                    try:
+                                        response_gas_a = requests.post(GAS_URL, json=data_a)
+                                        if response_gas_a.status_code == 200:
+                                            pass
+                                        else:
+                                            st.error(f"❌ スプレッドシート送信エラー（Aパターン）: ステータスコード {response_gas_a.status_code}, 応答: {response_gas_a.text}")
+                                    except requests.exceptions.RequestException as e:
+                                        st.error(f"GASへのデータ送信中にネットワークエラーが発生しました（Aパターン）: {str(e)}")
+                                    except Exception as e:
+                                        st.error(f"GASへのデータ送信中に予期せぬエラーが発生しました（Aパターン）: {str(e)}")
+                                    # --- END AUTOMATIC RECORD ---
+
+                                except Exception as e:
+                                    st.error(f"AI採点中にエラーが発生しました（Aパターン）: {str(e)}")
+                                    st.session_state.score_a = "エラー"
+                                    st.session_state.comment_a = "AI応答エラー"
+                        else:
+                            st.error("利用回数の更新に失敗しました。")
+                            # 利用回数更新失敗時は、採点処理も行わない
+                    # ✅ ここまで利用回数チェックと消費のロジック
+
+                    st.success("Aパターンの診断が完了しました！")
+            
+            with result_col_a:
+                if st.session_state.score_a:
+                    st.markdown("### ✨ Aパターン診断結果")
+                    st.metric("総合スコア", st.session_state.score_a)
+                    st.info(f"**改善コメント:** {st.session_state.comment_a}")
+                    
+                    if industry in ["美容", "健康", "医療"]:
+                        with st.spinner("⚖️ 薬機法チェックを実行中（Aパターン）..."):
+                            yakujihou_prompt_a = f"""
+以下の広告文（改善コメント）が薬機法に違反していないかをチェックしてください。
+※これはバナー画像の内容に対するAIの改善コメントであり、実際の広告文ではありません。
+
+---
+{st.session_state.comment_a}
+---
+
+違反の可能性がある場合は、その理由も具体的に教えてください。
+「OK」「注意あり」どちらかで評価を返してください。
+"""
+                            try:
+                                yakujihou_response_a = client.chat.completions.create(
+                                    model="gpt-4o",
+                                    messages=[
+                                        {"role": "system", "content": "あなたは広告表現の専門家です。"},
+                                        {"role": "user", "content": yakujihou_prompt_a}
+                                    ],
+                                    max_tokens=500,
+                                    temperature=0.3,
+                                )
+                                st.session_state.yakujihou_a = yakujihou_response_a.choices[0].message.content.strip() if yakujihou_response_a.choices else "薬機法チェックの結果を取得できませんでした。"
+                                if "OK" in st.session_state.yakujihou_a:
+                                    st.success(f"薬機法チェック：{st.session_state.yakujihou_a}")
+                                else:
+                                    st.warning(f"薬機法チェック：{st.session_state.yakujihou_a}")
+                            except Exception as e:
+                                st.error(f"薬機法チェック中にエラーが発生しました（Aパターン）: {str(e)}")
+                                st.session_state.yakujihou_a = "エラー"
+
+        st.markdown("---")
+
+        # --- B Pattern Processing ---
+        if uploaded_file_b:
+            img_col_b, result_col_b = st.columns([1, 2])
+
+            with img_col_b:
+                st.image(Image.open(uploaded_file_b), caption="Bパターン画像", use_container_width=True)
+                if st.button("🚀 Bパターンを採点", key="score_b_btn"):
+                    # ✅ ここから利用回数チェックと消費のロジック
+                    if st.session_state.remaining_uses <= 0:
+                        st.warning(f"残り回数がありません。（{st.session_state.plan}プラン）")
+                        st.info("利用回数を増やすには、プランのアップグレードが必要です。")
+                    else:
+                        # 回数消費の実行
+                        if auth_utils.update_user_uses_in_firestore_rest(st.session_state["user"]):
+                            # 回数消費が成功した場合のみ、AI採点とデータ記録に進む
+                            image_b = Image.open(uploaded_file_b)
+                            buf_b = io.BytesIO()
+                            image_b.save(buf_b, format="PNG")
+                            img_str_b = base64.b64encode(buf_b.getvalue()).decode()
+
+                            with st.spinner("AIがBパターンを採点中です..."):
+                                try:
+                                    ai_prompt_text = f"""
+以下のバナー画像をプロ視点で採点してください。
+この広告のターゲット年代は「{age_group}」で、主な目的は「{purpose}」です。
+
+【評価基準】
+1. 内容が一瞬で伝わるか
+2. コピーの見やすさ
+3. 行動喚起
+4. 写真とテキストの整合性
+5. 情報量のバランス
+
+【ターゲット年代「{age_group}」と目的「{purpose}」を考慮した具体的なフィードバックをお願いします。】
+
+【出力形式】
+---
+スコア：{score_format}
+改善コメント：2～3行でお願いします
+---"""
+                                    response_b = client.chat.completions.create(
+                                        model="gpt-4o",
+                                        messages=[
+                                            {"role": "system", "content": "あなたは広告のプロです。"},
+                                            {"role": "user", "content": [
+                                                {"type": "text", "text": ai_prompt_text},
+                                                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str_b}"}}
+                                            ]}
+                                        ],
+                                        max_tokens=600
+                                    )
+                                    content_b = response_b.choices[0].message.content
+                                    st.session_state.ai_response_b = content_b
+
+                                    score_match_b = re.search(r"スコア[:：]\s*(.+)", content_b)
+                                    comment_match_b = re.search(r"改善コメント[:：]\s*(.+)", content_b)
+                                    st.session_state.score_b = score_match_b.group(1).strip() if score_match_b else "取得できず"
+                                    st.session_state.comment_b = comment_match_b.group(1).strip() if comment_match_b else "取得できず"
+
+                                    # --- AUTOMATICALLY RECORD TO SPREADSHEET AFTER SCORING ---
+                                    data_b = {
+                                        "sheet_name": "record_log",
+                                        "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                        "platform": sanitize(platform),
+                                        "category": sanitize(category),
+                                        "industry": sanitize(industry),
+                                        "age_group": sanitize(age_group),
+                                        "purpose": sanitize(purpose),
+                                        "score": sanitize(st.session_state.score_b),
+                                        "comment": sanitize(st.session_state.comment_b),
+                                        "result": sanitize(result_input),
+                                        "follower_gain": sanitize(follower_gain_input),
+                                        "memo": sanitize(memo_input),
+                                    }
+                                    try:
+                                        response_gas_b = requests.post(GAS_URL, json=data_b)
+                                        if response_gas_b.status_code == 200:
+                                            pass
+                                        else:
+                                            st.error(f"❌ スプレッドシート送信エラー（Bパターン）: ステータスコード {response_gas_b.status_code}, 応答: {response_gas_b.text}")
+                                    except requests.exceptions.RequestException as e:
+                                        st.error(f"GASへのデータ送信中にネットワークエラーが発生しました（Bパターン）: {str(e)}")
+                                    except Exception as e:
+                                        st.error(f"GASへのデータ送信中に予期せぬエラーが発生しました（Bパターン）: {str(e)}")
+                                    # --- END AUTOMATIC RECORD ---
+
+                                except Exception as e:
+                                    st.error(f"AI採点中にエラーが発生しました（Bパターン）: {str(e)}")
+                                    st.session_state.score_b = "エラー"
+                                    st.session_state.comment_b = "AI応答エラー"
+                        else:
+                            st.error("利用回数の更新に失敗しました。")
+                            # 利用回数更新失敗時は、採点処理も行わない
+                    # ✅ ここまで利用回数チェックと消費のロジック
+
+                    st.success("Bパターンの診断が完了しました！")
+
+            with result_col_b:
+                if st.session_state.score_b:
+                    st.markdown("### ✨ Bパターン診断結果")
+                    st.metric("総合スコア", st.session_state.score_b)
+                    st.info(f"**改善コメント:** {st.session_state.comment_b}")
+
+                    if industry in ["美容", "健康", "医療"]:
+                        with st.spinner("⚖️ 薬機法チェックを実行中（Bパターン）..."):
+                            yakujihou_prompt_b = f"""
+以下の広告文（改善コメント）が薬機法に違反していないかをチェックしてください。
+※これはバナー画像の内容に対するAIの改善コメントであり、実際の広告文ではありません。
+
+---
+{st.session_state.comment_b}
+---
+
+違反の可能性がある場合は、その理由も具体的に教えてください。
+「OK」「注意あり」どちらかで評価を返してください。
+"""
+                            try:
+                                yakujihou_response_b = client.chat.completions.create(
+                                    model="gpt-4o",
+                                    messages=[
+                                        {"role": "system", "content": "あなたは広告表現の専門家です。"},
+                                        {"role": "user", "content": yakujihou_prompt_b}
+                                    ],
+                                    max_tokens=500,
+                                    temperature=0.3,
+                                )
+                                st.session_state.yakujihou_b = yakujihou_response_b.choices[0].message.content.strip() if yakujihou_response_b.choices else "薬機法チェックの結果を取得できませんでした。"
+                                if "OK" in st.session_state.yakujihou_b:
+                                    st.success(f"薬機法チェック：{st.session_state.yakujihou_b}")
+                                else:
+                                    st.warning(f"薬機法チェック：{st.session_state.yakujihou_b}")
+                            except Exception as e:
+                                st.error(f"薬機法チェック中にエラーが発生しました（Bパターン）: {str(e)}")
+                                st.session_state.yakujihou_b = "エラー"
+
+        st.markdown("---")
+        # AB Test Comparison Function (displayed if both scores are available)
+        if st.session_state.score_a and st.session_state.score_b and \
+           st.session_state.score_a != "エラー" and st.session_state.score_b != "エラー":
+            if st.button("📊 A/Bテスト比較を実行", key="ab_compare_final_btn"):
+                with st.spinner("AIがA/Bパターンを比較しています..."):
+                    ab_compare_prompt = f"""
+以下のAパターンとBパターンの広告診断結果を比較し、総合的にどちらが優れているか、その理由と具体的な改善点を提案してください。
+
+---
+Aパターン診断結果:
+スコア: {st.session_state.score_a}
+改善コメント: {st.session_state.comment_a}
+薬機法チェック: {st.session_state.yakujihou_a}
+
+Bパターン診断結果:
+スコア: {st.session_state.score_b}
+改善コメント: {st.session_state.comment_b}
+薬機法チェック: {st.session_state.yakujihou_b}
+---
+
+【出力形式】
+---
+総合評価: Aパターンが優れている / Bパターンが優れている / どちらも改善が必要
+理由: (2〜3行で簡潔に)
+今後の改善提案: (具体的なアクションを1〜2点)
+---
+"""
+                    try:
+                        ab_compare_response = client.chat.completions.create(
+                            model="gpt-4o", # A/B comparison also uses GPT-4o
+                            messages=[
+                                {"role": "system", "content": "あなたは広告のプロであり、A/Bテストのスペシャリストです。"},
+                                {"role": "user", "content": ab_compare_prompt}
+                            ],
+                            max_tokens=700,
+                            temperature=0.5,
+                        )
+                        ab_compare_content = ab_compare_response.choices[0].message.content.strip()
+                        st.markdown("### 📈 A/Bテスト比較結果")
+                        st.write(ab_compare_content)
+                    except Exception as e:
+                        st.error(f"A/Bテスト比較中にエラーが発生しました: {str(e)}")
+
+with col2:
+    with st.expander("📌 採点基準はこちら", expanded=True): #
