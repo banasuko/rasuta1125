@@ -1,15 +1,15 @@
 [theme]
-# ボタン、リンク、強調表示のメインカラー（バナスコのアクセントカラー）
-primaryColor="#00E676"  # 鮮やかなグリーン（精密機器のLED表示などをイメージ）
+# 明るい背景に合う主要カラー（例：ボタン、強調表示）
+primaryColor="#0000FF"  # 鮮やかな青（newpeaceの青）
 
 # アプリケーション全体の背景色
-backgroundColor="#121212" # 非常に暗いグレー（ほぼ黒に近い）
+backgroundColor="#FFFFFF" # 純粋な白
 
 # サイドバーや一部コンポーネントの背景色
-secondaryBackgroundColor="#1E1E1E" # 背景より少し明るいグレー
+secondaryBackgroundColor="#F8F8F8" # わずかにグレーがかった白
 
-# テキストの標準色
-textColor="#E0E0E0" # 明るいグレー
+# テキストの標準色 (明るい背景に合うように暗くする)
+textColor="#333333" # 濃いグレー
 
 # フォントの設定（Streamlitでサポートされているもの）
 font="sans serif"
