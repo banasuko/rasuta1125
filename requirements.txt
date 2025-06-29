@@ -3,5 +3,5 @@ pillow
 requests
 openai
 pydrive2
-pyrebase4
+pyrebase          # pyrebase4 から pyrebase に変更
 python-dotenv
