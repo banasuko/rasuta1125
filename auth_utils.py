@@ -1,33 +1,60 @@
 # auth_utils.py
 import streamlit as st
 import os
-import pyrebase # ✅ 修正: pyrebase4 から pyrebase に変更
+import requests # ✅ 追加: requestsモジュールをインポート
 from dotenv import load_dotenv
 
 # .envファイルから環境変数を読み込む
 load_dotenv()
 
 # Firebase設定を環境変数から取得
-firebaseConfig = {
-    "apiKey": os.getenv("FIREBASE_API_KEY"),
-    "authDomain": os.getenv("FIREBASE_AUTH_DOMAIN"),
-    "projectId": os.getenv("FIREBASE_PROJECT_ID"),
-    "storageBucket": os.getenv("FIREBASE_STORAGE_BUCKET"),
-    "messagingSenderId": os.getenv("FIREBASE_MESSAGING_SENDER_ID"),
-    "appId": os.getenv("FIREBASE_APP_ID"),
-    "measurementId": os.getenv("FIREBASE_MEASUREMENT_ID")
-}
+# REST APIを使用するため、主にapiKeyが必要です
+FIREBASE_API_KEY = os.getenv("FIREBASE_API_KEY")
 
-# Firebaseを初期化
-# 初期化が成功したかどうかをセッションステートに保存
-try:
-    firebase = pyrebase.initialize_app(firebaseConfig) # ✅ 修正: pyrebase4 から pyrebase に変更
-    auth = firebase.auth()
-    if "firebase_initialized" not in st.session_state:
-        st.session_state.firebase_initialized = True
-except Exception as e:
-    st.error(f"Firebaseの初期化に失敗しました。`.env`ファイルの設定、またはFirebaseConfigの内容を確認してください: {e}")
-    st.stop() # Firebase初期化失敗時はここでアプリの実行を停止
+if not FIREBASE_API_KEY:
+    st.error("Firebase APIキーが.envファイルに見つかりません。")
+    st.stop()
+
+# Firebase Authentication REST APIのエンドポイントベースURL
+# Googleの公式ドキュメントに基づいて構築
+FIREBASE_AUTH_BASE_URL = "https://identitytoolkit.googleapis.com/v1/accounts:"
+
+# Streamlitのセッションステートを初期化
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+if "user" not in st.session_state:
+    st.session_state.user = None
+if "email" not in st.session_state:
+    st.session_state.email = None
+if "firebase_initialized" not in st.session_state:
+    st.session_state.firebase_initialized = True # REST APIなので初期化自体はエラーになりにくい
+
+
+def sign_in_with_email_and_password(email, password):
+    """Firebase REST API を使ってメールとパスワードでサインインする"""
+    url = f"{FIREBASE_AUTH_BASE_URL}signInWithPassword?key={FIREBASE_API_KEY}"
+    headers = {"Content-Type": "application/json"}
+    data = {
+        "email": email,
+        "password": password,
+        "returnSecureToken": True
+    }
+    response = requests.post(url, headers=headers, json=data)
+    response.raise_for_status() # HTTPエラーが発生した場合に例外を発生させる
+    return response.json()
+
+def create_user_with_email_and_password(email, password):
+    """Firebase REST API を使ってメールとパスワードでユーザーを作成する"""
+    url = f"{FIREBASE_AUTH_BASE_URL}signUp?key={FIREBASE_API_KEY}"
+    headers = {"Content-Type": "application/json"}
+    data = {
+        "email": email,
+        "password": password,
+        "returnSecureToken": True
+    }
+    response = requests.post(url, headers=headers, json=data)
+    response.raise_for_status() # HTTPエラーが発生した場合に例外を発生させる
+    return response.json()
 
 
 def login_page():
@@ -43,51 +70,53 @@ def login_page():
     with login_col:
         if st.button("ログイン", key="login_button"):
             try:
-                # Firebaseでサインイン
-                user = auth.sign_in_with_email_and_password(email, password)
-                # ログイン成功時、セッションステートに情報を保存
-                st.session_state["user"] = user["localId"]
-                st.session_state["email"] = user["email"]
+                user_info = sign_in_with_email_and_password(email, password)
+                st.session_state["user"] = user_info["localId"]
+                st.session_state["email"] = user_info["email"]
                 st.session_state["logged_in"] = True
-                st.success(f"ログインしました: {user['email']}")
+                st.success(f"ログインしました: {user_info['email']}")
                 st.rerun() # ログイン後、アプリを再実行してメインコンテンツを表示
+            except requests.exceptions.HTTPError as e:
+                error_code = e.response.json().get("error", {}).get("message", "Unknown error")
+                if error_code == "EMAIL_NOT_FOUND" or error_code == "INVALID_PASSWORD":
+                    st.error("ログインに失敗しました。メールアドレスまたはパスワードが間違っています。")
+                elif error_code == "USER_DISABLED":
+                    st.error("このアカウントは無効化されています。")
+                else:
+                    st.error(f"ログイン中にエラーが発生しました: {error_code}")
+                    # st.error(e.response.json()) # デバッグ用
             except Exception as e:
-                st.error("ログインに失敗しました。メールアドレスまたはパスワードが間違っています。")
-                # より詳細なエラーを見たい場合は以下の行を有効化
-                # st.error(e)
+                st.error(f"予期せぬエラーが発生しました: {e}")
 
     with create_col:
         if st.button("アカウント作成", key="create_account_button"):
             try:
-                # Firebaseでユーザー作成
-                user = auth.create_user_with_email_and_password(email, password)
-                st.success(f"アカウント '{email}' を作成しました。ログインしてください。")
+                user_info = create_user_with_email_and_password(email, password)
+                st.success(f"アカウント '{user_info['email']}' を作成しました。ログインしてください。")
+            except requests.exceptions.HTTPError as e:
+                error_code = e.response.json().get("error", {}).get("message", "Unknown error")
+                if error_code == "EMAIL_EXISTS":
+                    st.error("このメールアドレスは既に使用されています。")
+                elif error_code == "WEAK_PASSWORD":
+                    st.error("パスワードが弱すぎます（6文字以上必要）。")
+                else:
+                    st.error(f"アカウント作成中にエラーが発生しました: {error_code}")
+                    # st.error(e.response.json()) # デバッグ用
             except Exception as e:
-                st.error("アカウント作成に失敗しました。既に存在するメールアドレスか、パスワードが不正です（6文字以上必要）。")
-                # より詳細なエラーを見たい場合は以下の行を有効化
-                # st.error(e)
+                st.error(f"予期せぬエラーが発生しました: {e}")
 
 def logout():
     """ユーザーをログアウトさせる関数"""
-    if st.session_state.get("logged_in"): # ログイン状態であればログアウト処理を実行
-        try:
-            auth.sign_out()
-            # セッションステートのログイン情報をクリア
-            keys_to_clear = ["user", "email", "logged_in", "score_a", "comment_a", "yakujihou_a",
-                             "score_b", "comment_b", "yakujihou_b", "ai_response_a", "ai_response_b"]
-            for key in keys_to_clear:
-                if key in st.session_state:
-                    del st.session_state[key]
-            st.success("ログアウトしました。")
-            st.rerun() # ログアウト後、アプリを再実行してログイン画面に戻る
-        except Exception as e:
-            st.error(f"ログアウト中にエラーが発生しました: {e}")
-            # エラー時もセッション情報をクリアしてログイン画面に戻す試み
-            keys_to_clear = ["user", "email", "logged_in"]
-            for key in keys_to_clear:
-                if key in st.session_state:
-                    del st.session_state[key]
-            st.rerun()
+    if st.session_state.get("logged_in"):
+        # Firebase REST API にはログアウトのための直接的なエンドポイントはないため、
+        # セッション情報をクリアすることで「クライアント側でログアウト状態にする」
+        keys_to_clear = ["user", "email", "logged_in", "score_a", "comment_a", "yakujihou_a",
+                         "score_b", "comment_b", "yakujihou_b", "ai_response_a", "ai_response_b"]
+        for key in keys_to_clear:
+            if key in st.session_state:
+                del st.session_state[key]
+        st.success("ログアウトしました。")
+        st.rerun() # ログアウト後、アプリを再実行してログイン画面に戻る
 
 def check_login():
     """
@@ -99,7 +128,7 @@ def check_login():
         st.sidebar.write(f"ようこそ, {st.session_state.get('email')}!")
         st.sidebar.button("ログアウト", on_click=logout)
 
-    # ログインしていない、またはFirebase初期化エラーの場合は、ログインページを表示してアプリの実行を停止
-    if not st.session_state.get("logged_in") or not st.session_state.get("firebase_initialized"):
+    # ログインしていない場合は、ログインページを表示してアプリの実行を停止
+    if not st.session_state.get("logged_in"):
         login_page()
         st.stop() # ここでメインアプリの実行を停止
