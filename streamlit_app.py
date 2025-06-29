@@ -7,8 +7,8 @@ import requests
 from PIL import Image
 from datetime import datetime
 from openai import OpenAI
-from pydrive2.auth import GoogleAuth
-from pydrive2.drive import GoogleDrive
+# from pydrive2.auth import GoogleAuth  # ✅【変更①】削除
+# from pydrive2.drive import GoogleDrive # ✅【変更①】削除
 
 # OpenAI APIキーの読み込み
 openai_api_key = os.getenv("OPENAI_API_KEY")
@@ -19,9 +19,9 @@ client = OpenAI(api_key=openai_api_key)
 
 # GASとGoogle Driveの情報
 # GAS_URL はご自身のデプロイURLに置き換えてください
-GAS_URL = "https://script.google.com/macros/s/AKfycbzSKqG2HuYTgWSBQLYNQQFLRO0dv-BQ_PTZAPv-aklGNE81Ofctnf7BC-TD9nqF0yZe/exec"
-# FOLDER_ID はGoogle Driveの目的のフォルダIDに置き換えてください
-FOLDER_ID = "1oRyCu2sU9idRrj5tq5foQX3ArtCW7rP" 
+# あなたの最新のGAS URLを使うことを強く推奨します
+GAS_URL = "https://script.google.com/macros/s/AKfycbxUy3JI5xwncRHxv-WoHHNqiF7LLndhHTOzmLOHtNRJ2hNCo8PJi7-0fdbDjnfAGMlL/exec"
+# FOLDER_ID = "1oRyCu2sU9idRrj5tq5foQX3ArtCW7rP" # ✅【変更②】削除
 
 # 値をサニタイズするヘルパー関数
 def sanitize(value):
@@ -30,40 +30,7 @@ def sanitize(value):
         return "エラー"
     return value
 
-def upload_image_to_drive_get_url(pil_image, filename):
-    gauth = GoogleAuth()
-    try:
-        # Streamlit Cloudのような環境では credentials.json の配置や認証フローに工夫が必要です
-        # サービスアカウントまたはOAuth2.0のWebアプリケーションフローを検討してください
-        gauth.LoadCredentialsFile("credentials.json") 
-        if gauth.credentials is None:
-            gauth.CommandLineAuth()
-        elif gauth.access_token_expired:
-            gauth.Refresh()
-        else:
-            gauth.Authorize()
-    except Exception as e:
-        st.error(f"Google Drive認証エラー: {str(e)}。Streamlit Cloudのような環境では、サービスアカウントやOAuth2.0の利用を検討してください。")
-        # ローカルでのテスト目的でCommandLineAuthを再度試みるが、本番環境では不適切
-        # gauth.CommandLineAuth() 
-        return "UPLOAD_AUTH_ERROR" # エラーを示す特殊な文字列を返す
-
-    try:
-        drive = GoogleDrive(gauth)
-        temp_path = f"/tmp/{filename}"
-        pil_image.save(temp_path, format="PNG")
-        file_drive = drive.CreateFile({
-            'title': filename,
-            'mimeType': 'image/png',
-            'parents': [{'id': FOLDER_ID}]
-        })
-        file_drive.SetContentFile(temp_path)
-        file_drive.Upload()
-        file_drive.InsertPermission({'type': 'anyone', 'role': 'reader'})
-        return f"https://drive.google.com/uc?export=view&id={file_drive['id']}"
-    except Exception as e:
-        st.error(f"Google Driveへの画像アップロード中にエラーが発生しました: {str(e)}")
-        return "UPLOAD_FAILED" # エラーを示す特殊な文字列を返す
+# ✅【変更③】upload_image_to_drive_get_url 関数全体を削除
 
 # Streamlit UI設定
 st.set_page_config(layout="wide", page_title="バナスコAI")
@@ -198,24 +165,10 @@ with col1:
                     "result": sanitize(result_input),
                     "follower_gain": sanitize(follower_gain_input),
                     "memo": sanitize(memo_input),
+                    # "image_url": google_drive_url_a, # ✅【変更⑤】削除
                 }
                 
-                google_drive_url_a = "N/A"
-                try:
-                    # Google Driveへのアップロード
-                    if uploaded_file_a:
-                        image_a_pil = Image.open(uploaded_file_a)
-                        image_filename_a = f"Banasuko_A_Pattern_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
-                        google_drive_url_a = upload_image_to_drive_get_url(image_a_pil, image_filename_a)
-                        if google_drive_url_a not in ["UPLOAD_AUTH_ERROR", "UPLOAD_FAILED"]:
-                            data_a["image_url"] = google_drive_url_a # スプレッドシートにURLを追加
-                            st.success(f"Google Driveに画像をアップロードしました: [リンク]({google_drive_url_a})")
-                        else:
-                            data_a["image_url"] = google_drive_url_a # エラーメッセージをURLとして記録
-                            st.error(f"Google Driveへの画像アップロードに失敗しました（Aパターン）。エラータイプ: {google_drive_url_a}")
-                except Exception as e:
-                    st.error(f"Google Driveへの画像アップロード処理中に予期せぬエラーが発生しました（Aパターン）: {str(e)}")
-                    data_a["image_url"] = "UPLOAD_EXCEPTION"
+                # ✅【変更④】Driveアップロード部分を削除
 
                 st.write("🖋 送信データ（Aパターン）:", data_a)
                 try:
@@ -320,24 +273,10 @@ with col1:
                     "result": sanitize(result_input),
                     "follower_gain": sanitize(follower_gain_input),
                     "memo": sanitize(memo_input),
+                    # "image_url": google_drive_url_b, # ✅【変更⑤】削除
                 }
                 
-                google_drive_url_b = "N/A"
-                try:
-                    # Google Driveへのアップロード
-                    if uploaded_file_b:
-                        image_b_pil = Image.open(uploaded_file_b)
-                        image_filename_b = f"Banasuko_B_Pattern_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
-                        google_drive_url_b = upload_image_to_drive_get_url(image_b_pil, image_filename_b)
-                        if google_drive_url_b not in ["UPLOAD_AUTH_ERROR", "UPLOAD_FAILED"]:
-                            data_b["image_url"] = google_drive_url_b # スプレッドシートにURLを追加
-                            st.success(f"Google Driveに画像をアップロードしました: [リンク]({google_drive_url_b})")
-                        else:
-                            data_b["image_url"] = google_drive_url_b # エラーメッセージをURLとして記録
-                            st.error(f"Google Driveへの画像アップロードに失敗しました（Bパターン）。エラータイプ: {google_drive_url_b}")
-                except Exception as e:
-                    st.error(f"Google Driveへの画像アップロード処理中に予期せぬエラーが発生しました（Bパターン）: {str(e)}")
-                    data_b["image_url"] = "UPLOAD_EXCEPTION"
+                # ✅【変更④】Driveアップロード部分を削除
 
                 st.write("🖋 送信データ（Bパターン）:", data_b)
                 try:
@@ -410,6 +349,3 @@ with col2:
         - **5. 情報量のバランス**
             - 文字が多すぎず、視線誘導が自然で、情報が過負荷にならないか。
         """)
-    
-    st.markdown("---")
-    st.info("💡 **ヒント:** スコアやコメントは、広告改善のヒントとしてご活用ください。AIの提案は参考情報であり、最終的な判断は人間が行う必要があります。")
