@@ -5,7 +5,8 @@ import requests # Firebase Authentication REST API用
 from dotenv import load_dotenv
 import firebase_admin # Firestore用
 from firebase_admin import credentials, firestore # Firestore用
-import json # JSON文字列のパース用
+# jsonモジュールは、個別の環境変数で渡すため不要になるが、念のため残しておく
+# import json 
 
 # .envファイルから環境変数を読み込む
 load_dotenv()
@@ -21,19 +22,32 @@ if not FIREBASE_API_KEY:
 FIREBASE_AUTH_BASE_URL = "https://identitytoolkit.googleapis.com/v1/accounts:"
 
 # --- Firebase Admin SDKの初期化 (Firestore用) ---
-# これはFirebaseのサービスアカウントキーが必要です。
-# .envファイル、またはStreamlit SecretsにJSON文字列として保存することを強く推奨します。
-# 例: FIREBASE_ADMIN_SDK_CONFIG='{"type": "service_account", "project_id": "...", ...}'
+# 各部分を環境変数から個別に取得し、Pythonコード内でJSONオブジェクトとして構築
 try:
     if "firebase_admin_initialized" not in st.session_state:
-        service_account_info_str = os.getenv("FIREBASE_ADMIN_SDK_CONFIG")
-        
-        if not service_account_info_str:
-            st.error("環境変数 'FIREBASE_ADMIN_SDK_CONFIG' が設定されていません。Firebase Admin SDKのサービスアカウントキーが必要です。")
+        admin_project_id = os.getenv("FIREBASE_PROJECT_ID_ADMIN")
+        admin_private_key = os.getenv("FIREBASE_PRIVATE_KEY_ADMIN") # Secretsから直接Private Key文字列を取得
+        admin_client_email = os.getenv("FIREBASE_CLIENT_EMAIL_ADMIN")
+
+        # 必須の環境変数が設定されているかチェック
+        if not admin_project_id or not admin_private_key or not admin_client_email:
+            st.error("Firebase Admin SDKの環境変数（PROJECT_ID_ADMIN, PRIVATE_KEY_ADMIN, CLIENT_EMAIL_ADMIN）が不足しています。Secretsを確認してください。")
             st.stop()
-        
-        # JSON文字列をPython辞書に変換
-        service_account_info = json.loads(service_account_info_str)
+
+        # サービスアカウント情報（辞書形式で構築）
+        service_account_info = {
+            "type": "service_account",
+            "project_id": admin_project_id,
+            "private_key_id": os.getenv("FIREBASE_PRIVATE_KEY_ID_ADMIN"), # もしSecretsにあれば読み込む
+            "private_key": admin_private_key, # エスケープ不要な形式で取得
+            "client_email": admin_client_email,
+            "client_id": os.getenv("FIREBASE_CLIENT_ID_ADMIN"), # もしSecretsにあれば読み込む
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+            "client_x509_cert_url": f"https://www.googleapis.com/robot/v1/metadata/x509/{admin_client_email.replace('@', '%40')}",
+            "universe_domain": "googleapis.com"
+        }
         
         cred = credentials.Certificate(service_account_info)
         firebase_admin.initialize_app(cred)
@@ -41,7 +55,8 @@ try:
         db = firestore.client() # Firestoreクライアントを初期化
 except Exception as e:
     st.error(f"Firebase Admin SDKの初期化に失敗しました。サービスアカウントキーを確認してください: {e}")
-    st.stop() # Admin SDK初期化失敗時はアプリの実行を停止
+    st.error(f"エラー詳細: {e}") # デバッグ用
+    st.stop()
 
 
 # Streamlitのセッションステートを初期化 (初回ロード時のみ)
@@ -60,7 +75,7 @@ if "remaining_uses" not in st.session_state:
 # --- Firebase Authentication REST APIの関数 ---
 def sign_in_with_email_and_password(email, password):
     """Firebase REST API を使ってメールとパスワードでサインインする"""
-    url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={FIREBASE_API_KEY}"
+    url = f"{FIREBASE_AUTH_BASE_URL}signInWithPassword?key={FIREBASE_API_KEY}"
     headers = {"Content-Type": "application/json"}
     data = {
         "email": email,
@@ -73,7 +88,7 @@ def sign_in_with_email_and_password(email, password):
 
 def create_user_with_email_and_password(email, password):
     """Firebase REST API を使ってメールとパスワードでユーザーを作成する"""
-    url = f"https://identitytoolkit.googleapis.com/v1/accounts:signUp?key={FIREBASE_API_KEY}"
+    url = f"{FIREBASE_AUTH_BASE_URL}signUp?key={FIREBASE_API_KEY}"
     headers = {"Content-Type": "application/json"}
     data = {
         "email": email,
@@ -227,3 +242,4 @@ def check_login():
     if not st.session_state.get("logged_in"):
         login_page()
         st.stop() # ここでメインアプリの実行を停止
+
