@@ -1,7 +1,7 @@
 import os
 import json
 import streamlit as st
-import pyrebase
+import pyrebase  # ← pyrebase4でOK
 import firebase_admin
 from firebase_admin import credentials, firestore
 
@@ -31,19 +31,15 @@ if not firebase_admin._apps:
 
 db = firestore.client()
 
-# --- Firestoreからユーザー情報を取得（残回数やプラン） ---
+# --- Firestoreからユーザー情報を取得 ---
 def get_user_data(email):
-    doc_ref = db.collection("users").document(email)
-    doc = doc_ref.get()
-    if doc.exists:
-        return doc.to_dict()
-    else:
-        return None
+    doc = db.collection("users").document(email).get()
+    return doc.to_dict() if doc.exists else None
 
-# --- Firestoreにユーザー情報を登録（初回用） ---
+# --- Firestoreにユーザー情報を初期化 ---
 def initialize_user(email):
-    doc_ref = db.collection("users").document(email)
-    doc_ref.set({
+    db.collection("users").document(email).set({
         "plan": "free",
-        "remaining_uses": 5  # Freeプランは月5回まで
+        "remaining_uses": 5
     })
+
