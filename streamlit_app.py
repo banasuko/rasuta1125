@@ -400,7 +400,7 @@ with col1:
                         st.warning(f"残り回数がありません。（{st.session_state.plan}プラン）")
                         st.info("利用回数を増やすには、プランのアップグレードが必要です。")
                     else:
-                        if auth_utils.update_user_uses_in_firestore_rest(st.session_state["user"]): # ✅ update_user_uses_in_firestore_rest から update_user_uses_in_firestore に変更
+                        if auth_utils.update_user_uses_in_firestore(st.session_state["user"]): # ✅ update_user_uses_in_firestore_rest から update_user_uses_in_firestore に変更
                             image_b = Image.open(uploaded_file_b)
                             buf_b = io.BytesIO()
                             image_b.save(buf_b, format="PNG")
@@ -550,125 +550,6 @@ Bパターン診断結果:
                             messages=[
                                 {"role": "system", "content": "あなたは広告のプロであり、A/Bテストのスペシャリストです。"},
                                 {"role": "user", "content": ab_compare_prompt}
-                                {"type": "text", "text": ai_prompt_text},
-                                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str_b}"}}
-                                            ]}
-                                        ],
-                                        max_tokens=600
-                                    )
-                                    content_b = response_b.choices[0].message.content
-                                    st.session_state.ai_response_b = content_b
-
-                                    score_match_b = re.search(r"スコア[:：]\s*(.+)", content_b)
-                                    comment_match_b = re.search(r"改善コメント[:：]\s*(.+)", content_b)
-                                    st.session_state.score_b = score_match_b.group(1).strip() if score_match_b else "取得できず"
-                                    st.session_state.comment_b = comment_match_b.group(1).strip() if comment_match_b else "取得できず"
-
-                                    data_b = {
-                                        "sheet_name": "record_log",
-                                        "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                                        "platform": sanitize(platform),
-                                        "category": sanitize(category),
-                                        "industry": sanitize(industry),
-                                        "age_group": sanitize(age_group),
-                                        "purpose": sanitize(purpose),
-                                        "score": sanitize(st.session_state.score_b),
-                                        "comment": sanitize(st.session_state.comment_b),
-                                        "result": sanitize(result_input),
-                                        "follower_gain": sanitize(follower_gain_input),
-                                        "memo": sanitize(memo_input),
-                                    }
-                                    try:
-                                        response_gas_b = requests.post(GAS_URL, json=data_b)
-                                        if response_gas_b.status_code == 200:
-                                            pass
-                                        else:
-                                            st.error(f"❌ スプレッドシート送信エラー（Bパターン）: ステータスコード {response_gas_b.status_code}, 応答: {response_gas_b.text}")
-                                    except requests.exceptions.RequestException as e:
-                                        st.error(f"GASへのデータ送信中にネットワークエラーが発生しました（Bパターン）: {str(e)}")
-                                    except Exception as e:
-                                        st.error(f"GASへのデータ送信中に予期せぬエラーが発生しました（Bパターン）: {str(e)}")
-
-                                except Exception as e:
-                                    st.error(f"AI採点中にエラーが発生しました（Bパターン）: {str(e)}")
-                                    st.session_state.score_b = "エラー"
-                                    st.session_state.comment_b = "AI応答エラー"
-                        else:
-                            st.error("利用回数の更新に失敗しました。")
-                    st.success("Bパターンの診断が完了しました！")
-
-            with result_col_b:
-                if st.session_state.score_b:
-                    st.markdown("### ✨ Bパターン診断結果")
-                    st.metric("総合スコア", st.session_state.score_b)
-                    st.info(f"**改善コメント:** {st.session_state.comment_b}")
-
-                    if industry in ["美容", "健康", "医療"]:
-                        with st.spinner("⚖️ 薬機法チェックを実行中（Bパターン）..."):
-                            yakujihou_prompt_b = f"""
-以下の広告文（改善コメント）が薬機法に違反していないかをチェックしてください。
-※これはバナー画像の内容に対するAIの改善コメントであり、実際の広告文ではありません。
-
----
-{st.session_state.comment_b}
----
-
-違反の可能性がある場合は、その理由も具体的に教えてください。
-「OK」「注意あり」どちらかで評価を返してください。
-"""
-                            try:
-                                yakujihou_response_b = client.chat.completions.create(
-                                    model="gpt-4o",
-                                    messages=[
-                                        {"role": "system", "content": "あなたは広告表現の専門家です。"},
-                                        {"role": "user", "content": yakujihou_prompt_b}
-                                    ],
-                                    max_tokens=500,
-                                    temperature=0.3,
-                                )
-                                st.session_state.yakujihou_b = yakujihou_response_b.choices[0].message.content.strip() if yakujihou_response_b.choices else "薬機法チェックの結果を取得できませんでした。"
-                                if "OK" in st.session_state.yakujihou_b:
-                                    st.success(f"薬機法チェック：{st.session_state.yakujihou_b}")
-                                else:
-                                    st.warning(f"薬機法チェック：{st.session_state.yakujihou_b}")
-                            except Exception as e:
-                                st.error(f"薬機法チェック中にエラーが発生しました（Bパターン）: {str(e)}")
-                                st.session_state.yakujihou_b = "エラー"
-
-        st.markdown("---")
-        # AB Test Comparison Function (displayed if both scores are available)
-        if st.session_state.score_a and st.session_state.score_b and \
-           st.session_state.score_a != "エラー" and st.session_state.score_b != "エラー":
-            if st.button("📊 A/Bテスト比較を実行", key="ab_compare_final_btn"):
-                with st.spinner("AIがA/Bパターンを比較しています..."):
-                    ab_compare_prompt = f"""
-以下のAパターンとBパターンの広告診断結果を比較し、総合的にどちらが優れているか、その理由と具体的な改善点を提案してください。
-
----
-Aパターン診断結果:
-スコア: {st.session_state.score_a}
-改善コメント: {st.session_state.comment_a}
-薬機法チェック: {st.session_state.yakujihou_a}
-
-Bパターン診断結果:
-スコア: {st.session_state.score_b}
-改善コメント: {st.session_state.comment_b}
-薬機法チェック: {st.session_state.yakujihou_b}
----
-
-【出力形式】
----
-総合評価: Aパターンが優れている / Bパターンが優れている / どちらも改善が必要
-理由: (2〜3行で簡潔に)
-今後の改善提案: (具体的なアクションを1〜2点)
----
-"""
-                    try:
-                        ab_compare_response = client.chat.completions.create(
-                            model="gpt-4o", # A/B comparison also uses GPT-4o
-                            messages=[
-                                {"role": "system", "content": "あなたは広告のプロであり、A/Bテストのスペシャリストです。"},
-                                {"role": "user", "content": ab_compare_prompt}
                             ],
                             max_tokens=700,
                             temperature=0.5,
@@ -701,3 +582,4 @@ with col2:
     st.info(
         "💡 **ヒント:** スコアやコメントは、広告改善のヒントとしてご活用ください。AIの提案は参考情報であり、最終的な判断は人間が行う必要があります。"
     )
+
