@@ -271,7 +271,8 @@ with col1:
                         st.warning(f"残り回数がありません。（{st.session_state.plan}プラン）")
                         st.info("利用回数を増やすには、プランのアップグレードが必要です。")
                     else:
-                        if auth_utils.update_user_uses_in_firestore(st.session_state["user"]): # ✅ update_user_uses_in_firestore_rest から update_user_uses_in_firestore に変更
+                        # ✅ 利用回数消費の呼び出しを auth_utils.update_user_uses_in_firestore_rest に変更
+                        if auth_utils.update_user_uses_in_firestore_rest(st.session_state["user"], st.session_state["id_token"]): 
                             image_a = Image.open(uploaded_file_a)
                             buf_a = io.BytesIO()
                             image_a.save(buf_a, format="PNG")
@@ -373,7 +374,7 @@ with col1:
                                     model="gpt-4o",
                                     messages=[
                                         {"role": "system", "content": "あなたは広告表現の専門家です。"},
-                                        {"role": "user", "content": yakujihou_prompt_a}
+                                        {"role": "user", "content": yakijihou_prompt_a} # ✅ yakujihou_prompt_a に修正
                                     ],
                                     max_tokens=500,
                                     temperature=0.3,
@@ -400,7 +401,7 @@ with col1:
                         st.warning(f"残り回数がありません。（{st.session_state.plan}プラン）")
                         st.info("利用回数を増やすには、プランのアップグレードが必要です。")
                     else:
-                        if auth_utils.update_user_uses_in_firestore(st.session_state["user"]): # ✅ update_user_uses_in_firestore_rest から update_user_uses_in_firestore に変更
+                        if auth_utils.update_user_uses_in_firestore_rest(st.session_state["user"]): # ✅ update_user_uses_in_firestore_rest から update_user_uses_in_firestore に変更
                             image_b = Image.open(uploaded_file_b)
                             buf_b = io.BytesIO()
                             image_b.save(buf_b, format="PNG")
@@ -582,4 +583,3 @@ with col2:
     st.info(
         "💡 **ヒント:** スコアやコメントは、広告改善のヒントとしてご活用ください。AIの提案は参考情報であり、最終的な判断は人間が行う必要があります。"
     )
-
