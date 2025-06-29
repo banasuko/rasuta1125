@@ -22,7 +22,7 @@ client = OpenAI(api_key=openai_api_key)
 # あなたの最新のGAS URLを使うことを強く推奨します
 GAS_URL = "https://script.google.com/macros/s/AKfycbxUy3JI5xwncRHxv-WoHHNqiF7LLndhHTOzmLOHtNRJ2hNCo8PJi7-0fdbDjnfAGMlL/exec"
 # FOLDER_ID はGoogle Driveの目的のフォルダIDに置き換えてください
-# FOLDER_ID = "1oRyCu2sU9idRrj5tq5foQX3ArtCW7rP" # ✅【変更②】削除 (今回は使わないため)
+# FOLDER_ID = "1oRyCu2sU9idRrj5tq5foQX3ArtCW7rP" # 今回は使わないため削除
 
 # 値をサニタイズするヘルパー関数
 def sanitize(value):
@@ -84,7 +84,7 @@ with col1:
 
             with img_col_a:
                 st.image(Image.open(uploaded_file_a), caption="Aパターン画像", use_container_width=True) # use_container_widthでカラム幅に合わせる
-                if st.button("🚀 Aパターンを採点＋保存", key="score_save_a_btn"):
+                if st.button("🚀 Aパターンを採点", key="score_a_btn"): # ボタン名を変更
                     image_a = Image.open(uploaded_file_a)
                     buf_a = io.BytesIO()
                     image_a.save(buf_a, format="PNG")
@@ -157,32 +157,35 @@ with col1:
                                 st.error(f"薬機法チェック中にエラーが発生しました（Aパターン）: {str(e)}")
                                 st.session_state.yakujihou_a = "エラー"
 
-                # データ送信は採点ボタン内で行う（これは前回のまま）
-                if st.button("✅ 結果をスプレッドシートに保存（A）", key="save_to_sheet_a_btn"): # 新しい保存ボタンを追加
-                    data_a = {
-                        "sheet_name": "record_log",
-                        "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                        "platform": sanitize(platform),
-                        "category": sanitize(category),
-                        "industry": sanitize(industry),
-                        "score": sanitize(st.session_state.score_a),
-                        "comment": sanitize(st.session_state.comment_a),
-                        "result": sanitize(result_input),
-                        "follower_gain": sanitize(follower_gain_input),
-                        "memo": sanitize(memo_input),
-                    }
-                    
-                    st.write("🖋 送信データ（Aパターン）:", data_a)
-                    try:
-                        response_gas_a = requests.post(GAS_URL, json=data_a)
-                        if response_gas_a.status_code == 200:
-                            st.success("📊 スプレッドシートに記録しました！（Aパターン）")
-                        else:
-                            st.error(f"❌ スプレッドシート送信エラー（Aパターン）: ステータスコード {response_gas_a.status_code}, 応答: {response_gas_a.text}")
-                    except requests.exceptions.RequestException as e:
-                        st.error(f"GASへのデータ送信中にネットワークエラーが発生しました（Aパターン）: {str(e)}")
-                    except Exception as e:
-                        st.error(f"GASへのデータ送信中に予期せぬエラーが発生しました（Aパターン）: {str(e)}")
+                # 結果がAIによって生成された後に保存ボタンを表示
+                if st.session_state.score_a: # スコアが取得されていれば表示
+                    if st.button("✅ スプレッドシートに記録（Aパターン）", key="save_to_sheet_a_btn"): # ボタン名を変更
+                        data_a = {
+                            "sheet_name": "record_log",
+                            "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                            "platform": sanitize(platform),
+                            "category": sanitize(category),
+                            "industry": sanitize(industry),
+                            "score": sanitize(st.session_state.score_a),
+                            "comment": sanitize(st.session_state.comment_a),
+                            "result": sanitize(result_input),
+                            "follower_gain": sanitize(follower_gain_input),
+                            "memo": sanitize(memo_input),
+                        }
+                        
+                        # st.write("🖋 送信データ（Aパターン）:", data_a) # ✅【変更】コメントアウト
+                        try:
+                            response_gas_a = requests.post(GAS_URL, json=data_a)
+                            if response_gas_a.status_code == 200:
+                                st.success("📊 スプレッドシートに記録しました！（Aパターン）")
+                            else:
+                                st.error(f"❌ スプレッドシート送信エラー（Aパターン）: ステータスコード {response_gas_a.status_code}, 応答: {response_gas_a.text}")
+                            # st.write("📡 GAS応答ステータスコード:", response_gas_a.status_code) # ✅【変更】コメントアウト
+                            # st.write("📄 GAS応答本文:", response_gas_a.text)       # ✅【変更】コメントアウト
+                        except requests.exceptions.RequestException as e:
+                            st.error(f"GASへのデータ送信中にネットワークエラーが発生しました（Aパターン）: {str(e)}")
+                        except Exception as e:
+                            st.error(f"GASへのデータ送信中に予期せぬエラーが発生しました（Aパターン）: {str(e)}")
             
         st.markdown("---")
 
@@ -192,7 +195,7 @@ with col1:
 
             with img_col_b:
                 st.image(Image.open(uploaded_file_b), caption="Bパターン画像", use_container_width=True)
-                if st.button("🚀 Bパターンを採点＋保存", key="score_save_b_btn"):
+                if st.button("🚀 Bパターンを採点", key="score_b_btn"): # ボタン名を変更
                     image_b = Image.open(uploaded_file_b)
                     buf_b = io.BytesIO()
                     image_b.save(buf_b, format="PNG")
@@ -264,31 +267,34 @@ with col1:
                                 st.error(f"薬機法チェック中にエラーが発生しました（Bパターン）: {str(e)}")
                                 st.session_state.yakujihou_b = "エラー"
 
-                if st.button("✅ 結果をスプレッドシートに保存（B）", key="save_to_sheet_b_btn"): # 新しい保存ボタンを追加
-                    data_b = {
-                        "sheet_name": "record_log",
-                        "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                        "platform": sanitize(platform),
-                        "category": sanitize(category),
-                        "industry": sanitize(industry),
-                        "score": sanitize(st.session_state.score_b),
-                        "comment": sanitize(st.session_state.comment_b),
-                        "result": sanitize(result_input),
-                        "follower_gain": sanitize(follower_gain_input),
-                        "memo": sanitize(memo_input),
-                    }
-                    
-                    st.write("🖋 送信データ（Bパターン）:", data_b)
-                    try:
-                        response_gas_b = requests.post(GAS_URL, json=data_b)
-                        if response_gas_b.status_code == 200:
-                            st.success("📊 スプレッドシートに記録しました！（Bパターン）")
-                        else:
-                            st.error(f"❌ スプレッドシート送信エラー（Bパターン）: ステータスコード {response_gas_b.status_code}, 応答: {response_gas_b.text}")
-                    except requests.exceptions.RequestException as e:
-                        st.error(f"GASへのデータ送信中にネットワークエラーが発生しました（Bパターン）: {str(e)}")
-                    except Exception as e:
-                        st.error(f"GASへのデータ送信中に予期せぬエラーが発生しました（Bパターン）: {str(e)}")
+                if st.session_state.score_b: # スコアが取得されていれば表示
+                    if st.button("✅ スプレッドシートに記録（Bパターン）", key="save_to_sheet_b_btn"): # ボタン名を変更
+                        data_b = {
+                            "sheet_name": "record_log",
+                            "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                            "platform": sanitize(platform),
+                            "category": sanitize(category),
+                            "industry": sanitize(industry),
+                            "score": sanitize(st.session_state.score_b),
+                            "comment": sanitize(st.session_state.comment_b),
+                            "result": sanitize(result_input),
+                            "follower_gain": sanitize(follower_gain_input),
+                            "memo": sanitize(memo_input),
+                        }
+                        
+                        # st.write("🖋 送信データ（Bパターン）:", data_b) # ✅【変更】コメントアウト
+                        try:
+                            response_gas_b = requests.post(GAS_URL, json=data_b)
+                            if response_gas_b.status_code == 200:
+                                st.success("📊 スプレッドシートに記録しました！（Bパターン）")
+                            else:
+                                st.error(f"❌ スプレッドシート送信エラー（Bパターン）: ステータスコード {response_gas_b.status_code}, 応答: {response_gas_b.text}")
+                            # st.write("📡 GAS応答ステータスコード:", response_gas_b.status_code) # ✅【変更】コメントアウト
+                            # st.write("📄 GAS応答本文:", response_gas_b.text)       # ✅【変更】コメントアウト
+                        except requests.exceptions.RequestException as e:
+                            st.error(f"GASへのデータ送信中にネットワークエラーが発生しました（Bパターン）: {str(e)}")
+                        except Exception as e:
+                            st.error(f"GASへのデータ送信中に予期せぬエラーが発生しました（Bパターン）: {str(e)}")
 
         st.markdown("---")
         # ABテスト比較機能（両方の診断が完了したら表示）
