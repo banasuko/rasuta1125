@@ -271,8 +271,8 @@ with col1:
                         st.warning(f"残り回数がありません。（{st.session_state.plan}プラン）")
                         st.info("利用回数を増やすには、プランのアップグレードが必要です。")
                     else:
-                        # ✅ 利用回数消費の呼び出しを auth_utils.update_user_uses_in_firestore_rest に修正
-                        if auth_utils.update_user_uses_in_firestore_rest(st.session_state["user"], st.session_state["id_token"]): 
+                        # ここで回数消費のAPIを呼び出す
+                        if auth_utils.update_user_uses_in_firestore_rest(st.session_state["user"], st.session_state["id_token"]):
                             image_a = Image.open(uploaded_file_a)
                             buf_a = io.BytesIO()
                             image_a.save(buf_a, format="PNG")
@@ -401,7 +401,7 @@ with col1:
                         st.warning(f"残り回数がありません。（{st.session_state.plan}プラン）")
                         st.info("利用回数を増やすには、プランのアップグレードが必要です。")
                     else:
-                        # ✅ 利用回数消費の呼び出しを auth_utils.update_user_uses_in_firestore_rest に修正
+                        # ✅ 利用回数消費の呼び出しを auth_utils.update_user_uses_in_firestore_rest に変更
                         if auth_utils.update_user_uses_in_firestore_rest(st.session_state["user"], st.session_state["id_token"]): 
                             image_b = Image.open(uploaded_file_b)
                             buf_b = io.BytesIO()
