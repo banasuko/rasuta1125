@@ -12,7 +12,7 @@ import auth_utils # ✅ auth_utils.py をインポート
 
 
 # GASとGoogle Driveの情報
-GAS_URL = "https://script.google.com/macros/s/AKfycbxUy3JI5xwncRHxv-WoHHNqiF7LLndhHTOzmLOHtNRJ2hNCo8PJi7-0fdbDjnfAGMlL/exec"
+GAS_URL = "https://script.google.com/macros/s/AKfycbzUy3JI5xwncRHxv-WoHHNqiF7LLndhHTOzmLOHtNRJ2hNCo8PJi7-0fdbDjnfAGMlL/exec"
 
 # Helper function to sanitize values
 def sanitize(value):
@@ -39,6 +39,14 @@ except FileNotFoundError:
 # --- ログインチェックを実行 ---
 # これが最も重要！この行より下は、ログイン済みの場合にのみ実行されます
 auth_utils.check_login()
+
+# --- OpenAIクライアントの初期化 ---
+# ログインチェック後に、OpenAI APIキーが環境変数から利用可能になった状態で初期化
+openai_api_key = os.getenv("OPENAI_API_KEY")
+if not openai_api_key:
+    st.error("❌ OpenAI APIキーが見つかりませんでした。`.env` を確認してください。")
+    st.stop()
+client = OpenAI(api_key=openai_api_key) # ✅ OpenAIクライアントをここで初期化
 
 
 # --- カスタムCSSの追加 (背景色を完全に白に固定 & Newpeace デザインに合わせた明るいテーマ) ---
@@ -374,7 +382,7 @@ with col1:
                                     model="gpt-4o",
                                     messages=[
                                         {"role": "system", "content": "あなたは広告表現の専門家です。"},
-                                        {"role": "user", "content": yakijihou_prompt_a} # ✅ yakujihou_prompt_a に修正
+                                        {"role": "user", "content": yakujihou_prompt_a}
                                     ],
                                     max_tokens=500,
                                     temperature=0.3,
@@ -401,7 +409,7 @@ with col1:
                         st.warning(f"残り回数がありません。（{st.session_state.plan}プラン）")
                         st.info("利用回数を増やすには、プランのアップグレードが必要です。")
                     else:
-                        if auth_utils.update_user_uses_in_firestore_rest(st.session_state["user"]): # ✅ update_user_uses_in_firestore_rest から update_user_uses_in_firestore に変更
+                        if auth_utils.update_user_uses_in_firestore(st.session_state["user"]): # ✅ update_user_uses_in_firestore_rest に修正
                             image_b = Image.open(uploaded_file_b)
                             buf_b = io.BytesIO()
                             image_b.save(buf_b, format="PNG")
