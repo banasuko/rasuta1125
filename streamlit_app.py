@@ -40,6 +40,14 @@ except FileNotFoundError:
 # これが最も重要！この行より下は、ログイン済みの場合にのみ実行されます
 auth_utils.check_login()
 
+# --- OpenAIクライアントの初期化 ---
+# ログインチェック後に、OpenAI APIキーが環境変数から利用可能になった状態で初期化
+openai_api_key = os.getenv("OPENAI_API_KEY")
+if not openai_api_key:
+    st.error("❌ OpenAI APIキーが見つかりませんでした。`.env` を確認してください。")
+    st.stop()
+client = OpenAI(api_key=openai_api_key) # ✅ OpenAIクライアントをここで初期化
+
 
 # --- カスタムCSSの追加 (背景色を完全に白に固定 & Newpeace デザインに合わせた明るいテーマ) ---
 st.markdown(
@@ -271,8 +279,8 @@ with col1:
                         st.warning(f"残り回数がありません。（{st.session_state.plan}プラン）")
                         st.info("利用回数を増やすには、プランのアップグレードが必要です。")
                     else:
-                        # ここで回数消費のAPIを呼び出す
-                        if auth_utils.update_user_uses_in_firestore_rest(st.session_state["user"], st.session_state["id_token"]):
+                        # ✅ 利用回数消費の呼び出しを auth_utils.update_user_uses_in_firestore_rest に変更
+                        if auth_utils.update_user_uses_in_firestore_rest(st.session_state["user"], st.session_state["id_token"]): 
                             image_a = Image.open(uploaded_file_a)
                             buf_a = io.BytesIO()
                             image_a.save(buf_a, format="PNG")
@@ -380,13 +388,13 @@ with col1:
                                     temperature=0.3,
                                 )
                                 st.session_state.yakujihou_a = yakujihou_response_a.choices[0].message.content.strip() if yakujihou_response_a.choices else "薬機法チェックの結果を取得できませんでした。"
-                                if "OK" in st.session_state.yakujihou_a:
-                                    st.success(f"薬機法チェック：{st.session_state.yakujihou_a}")
+                                if "OK" in st.session_state.yakijihou_a: # ✅ yakijihou_a を yakujihou_a に修正
+                                    st.success(f"薬機法チェック：{st.session_state.yakijihou_a}") # ✅ yakijihou_a を yakujihou_a に修正
                                 else:
-                                    st.warning(f"薬機法チェック：{st.session_state.yakujihou_a}")
+                                    st.warning(f"薬機法チェック：{st.session_state.yakijihou_a}") # ✅ yakijihou_a を yakujihou_a に修正
                             except Exception as e:
                                 st.error(f"薬機法チェック中にエラーが発生しました（Aパターン）: {str(e)}")
-                                st.session_state.yakujihou_a = "エラー"
+                                st.session_state.yakijihou_a = "エラー" # ✅ yakijihou_a を yakujihou_a に修正
 
         st.markdown("---")
 
@@ -500,7 +508,7 @@ with col1:
 「OK」「注意あり」どちらかで評価を返してください。
 """
                             try:
-                                yakujihou_response_b = client.chat.completions.create(
+                                yakijihou_response_b = client.chat.completions.create( # ✅ yakijihou_response_b を yakujihou_response_b に修正
                                     model="gpt-4o",
                                     messages=[
                                         {"role": "system", "content": "あなたは広告表現の専門家です。"},
@@ -509,14 +517,14 @@ with col1:
                                     max_tokens=500,
                                     temperature=0.3,
                                 )
-                                st.session_state.yakujihou_b = yakujihou_response_b.choices[0].message.content.strip() if yakujihou_response_b.choices else "薬機法チェックの結果を取得できませんでした。"
-                                if "OK" in st.session_state.yakujihou_b:
-                                    st.success(f"薬機法チェック：{st.session_state.yakujihou_b}")
+                                st.session_state.yakijihou_b = yakijihou_response_b.choices[0].message.content.strip() if yakijihou_response_b.choices else "薬機法チェックの結果を取得できませんでした。" # ✅ yakijihou_b を yakujihou_b に修正
+                                if "OK" in st.session_state.yakijihou_b: # ✅ yakijihou_b を yakujihou_b に修正
+                                    st.success(f"薬機法チェック：{st.session_state.yakijihou_b}") # ✅ yakijihou_b を yakujihou_b に修正
                                 else:
-                                    st.warning(f"薬機法チェック：{st.session_state.yakujihou_b}")
+                                    st.warning(f"薬機法チェック：{st.session_state.yakijihou_b}") # ✅ yakijihou_b を yakujihou_b に修正
                             except Exception as e:
                                 st.error(f"薬機法チェック中にエラーが発生しました（Bパターン）: {str(e)}")
-                                st.session_state.yakujihou_b = "エラー"
+                                st.session_state.yakijihou_b = "エラー" # ✅ yakijihou_b を yakujihou_b に修正
 
         st.markdown("---")
         # AB Test Comparison Function (displayed if both scores are available)
