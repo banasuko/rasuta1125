@@ -8,10 +8,10 @@ from PIL import Image
 from datetime import datetime
 from openai import OpenAI
 
-import auth_utils # ✅ auth_utils.py をインポート
+import auth_utils # Import auth_utils.py
 
 
-# GASとGoogle Driveの情報
+# Google Apps Script (GAS) and Google Drive information
 GAS_URL = "https://script.google.com/macros/s/AKfycby_uD6Jtb9GT0-atbyPKOPc8uyVKodwYVIQ2Tpe-_E8uTOPiir0Ce1NAPZDEOlCUxN4/exec"
 
 # Helper function to sanitize values
@@ -21,65 +21,63 @@ def sanitize(value):
         return "エラー"
     return value
 
-# Google Drive upload functionality is removed in this version
-
 
 # Streamlit UI configuration
 st.set_page_config(layout="wide", page_title="バナスコAI")
 
-# --- ロゴの表示 ---
+# --- Logo Display ---
 logo_path = "banasuko_logo_icon.png"
 
 try:
     logo_image = Image.open(logo_path)
-    st.sidebar.image(logo_image, use_container_width=True) # サイドバーの幅に合わせて表示
+    st.sidebar.image(logo_image, use_container_width=True) # Display logo in sidebar, adjusting to column width
 except FileNotFoundError:
     st.sidebar.error(f"ロゴ画像 '{logo_path}' が見つかりません。ファイルが正しく配置されているか確認してください。")
 
-# --- ログインチェックを実行 ---
-# これが最も重要！この行より下は、ログイン済みの場合にのみ実行されます
+# --- Login Check ---
+# This is crucial! Code below this line will only execute if the user is logged in.
 auth_utils.check_login()
 
-# --- OpenAIクライアントの初期化 ---
-# ログインチェック後に、OpenAI APIキーが環境変数から利用可能になった状態で初期化
+# --- OpenAI Client Initialization ---
+# Initialize OpenAI client after login check, when OpenAI API key is available from environment variables
 openai_api_key = os.getenv("OPENAI_API_KEY")
 if not openai_api_key:
     st.error("❌ OpenAI APIキーが見つかりませんでした。`.env` を確認してください。")
     st.stop()
-client = OpenAI(api_key=openai_api_key) # ✅ OpenAIクライアントをここで初期化
+client = OpenAI(api_key=openai_api_key)
 
 
-# --- カスタムCSSの追加 (背景色を完全に白に固定 & Newpeace デザインに合わせた明るいテーマ) ---
+# --- Custom CSS (White background and Newpeace-inspired theme) ---
 st.markdown(
     """
     <style>
-    /* 全体の背景色を強制的に白に設定 */
+    /* Force white background for the entire body */
     body {
         background-color: #FFFFFF !important;
-        background-image: none !important; /* 念のため、背景画像も無効化 */
+        background-image: none !important; /* Disable any background images */
     }
 
-    /* Streamlitのメインコンテナ */
+    /* Streamlit's main content container */
     .main .block-container {
-        background-color: #FFFFFF; /* メインコンテナの背景も白 */
+        background-color: #FFFFFF; /* Main container background to white */
         padding-top: 2rem;
         padding-right: 2rem;
         padding-left: 2rem;
         padding-bottom: 2rem;
         border-radius: 12px;
-        box-shadow: 0px 8px 20px rgba(0, 0, 0, 0.08);
+        box-shadow: 0px 8px 20px rgba(0, 0, 0, 0.08); /* Soft shadow */
     }
 
-    /* サイドバー */
+    /* Sidebar styling */
     .stSidebar {
-        background-color: #F8F8F8; /* 少し明るいグレー */
+        background-color: #F8F8F8; /* Slightly off-white/light gray */
         border-right: none;
         box-shadow: 2px 0px 10px rgba(0, 0, 0, 0.05);
     }
-
-    /* ボタン */
+    
+    /* Button styling */
     .stButton > button {
-        background-color: #0000FF; /* primaryColor (鮮やかな青) */
+        background-color: #0000FF; /* Primary color (vibrant blue) */
         color: white;
         border-radius: 8px;
         border: none;
@@ -88,32 +86,32 @@ st.markdown(
         font-weight: bold;
     }
     .stButton > button:hover {
-        background-color: #3333FF;
+        background-color: #3333FF; /* Lighter blue on hover */
         box-shadow: 0px 6px 15px rgba(0, 0, 255, 0.3);
     }
     .stButton > button:active {
-        background-color: #0000CC;
+        background-color: #0000CC; /* Darker blue on click */
         box-shadow: none;
     }
 
-    /* Expander */
+    /* Expander styling */
     .stExpander {
-        border: 1px solid #E0E0E0;
+        border: 1px solid #E0E0E0; /* Light gray border */
         border-radius: 8px;
-        background-color: #FFFFFF;
-        box-shadow: 0px 2px 5px rgba(0,0,0,0.05);
+        background-color: #FFFFFF; /* White background */
+        box-shadow: 0px 2px 5px rgba(0,0,0,0.05); /* Soft shadow */
     }
-    .stExpander > div > div {
-        background-color: #F8F8F8;
+    .stExpander > div > div { /* Header part */
+        background-color: #F8F8F8; /* Match secondaryBackgroundColor */
         border-bottom: 1px solid #E0E0E0;
         border-top-left-radius: 8px;
         border-top-right-radius: 8px;
     }
-    .stExpanderDetails {
-        background-color: #FFFFFF;
+    .stExpanderDetails { /* Expanded content part */
+        background-color: #FFFFFF; /* Same as expander body */
     }
 
-    /* テキスト入力、セレクトボックスなど */
+    /* Text input, selectbox, textarea styling */
     div[data-baseweb="input"] input,
     div[data-baseweb="select"] span,
     div[data-baseweb="textarea"] textarea,
@@ -121,62 +119,62 @@ st.markdown(
     .stTextInput .st-eb, /* Text input display */
     .stTextArea .st-eb /* Textarea display */
     {
-        background-color: #FFFFFF !important;
-        color: #333333 !important;
+        background-color: #FFFFFF !important; /* White background */
+        color: #333333 !important; /* Dark text */
         border-radius: 8px;
         border: 1px solid #E0E0E0;
-        box-shadow: inset 0px 1px 3px rgba(0,0,0,0.05);
+        box-shadow: inset 0px 1px 3px rgba(0,0,0,0.05); /* Subtle inner shadow */
     }
-    /* フォーカス時のスタイル */
+    /* Focus styling for input elements */
     div[data-baseweb="input"] input:focus,
     div[data-baseweb="select"] span:focus,
     div[data-baseweb="textarea"] textarea:focus,
     div[data-baseweb="input"]:focus-within,
     div[data-baseweb="select"]:focus-within,
     div[data-baseweb="textarea"]:focus-within {
-        border-color: #0000FF;
+        border-color: #0000FF; /* Accent blue on focus */
         box-shadow: 0 0 0 2px rgba(0, 0, 255, 0.3);
     }
 
-    /* メトリック */
+    /* Metric (st.metric) styling */
     [data-testid="stMetricValue"] {
-        color: #FFD700; /* 鮮やかな黄色 (Newpeaceの黄色をイメージ) */
+        color: #FFD700; /* Vibrant yellow (Newpeace-inspired) */
         font-size: 2.5rem;
         font-weight: bold;
     }
     [data-testid="stMetricLabel"] {
-        color: #666666;
+        color: #666666; /* Slightly darker label color */
         font-size: 0.9rem;
     }
     [data-testid="stMetricDelta"] {
-        color: #333333;
+        color: #333333; /* Delta text color */
     }
 
-    /* Info, Success, Warning, Errorボックス */
+    /* Alert boxes (Info, Success, Warning, Error) */
     .stAlert {
         color: #333333;
     }
     .stAlert.stAlert-info {
-        background-color: #E0EFFF;
-        border-left-color: #0000FF;
+        background-color: #E0EFFF; /* Light blue */
+        border-left-color: #0000FF; /* Dark blue border */
     }
     .stAlert.stAlert-success {
-        background-color: #E0FFE0;
-        border-left-color: #00AA00;
+        background-color: #E0FFE0; /* Light green */
+        border-left-color: #00AA00; /* Standard green */
     }
     .stAlert.stAlert-warning {
-        background-color: #FFFBE0;
-        border-left-color: #FFD700;
+        background-color: #FFFBE0; /* Light yellow */
+        border-left-color: #FFD700; /* Vibrant yellow */
     }
     .stAlert.stAlert-error {
-        background-color: #FFE0E0;
-        border-left-color: #FF0000;
+        background-color: #FFE0E0; /* Light red */
+        border-left-color: #FF0000; /* Vibrant red */
     }
 
-    /* コードブロック */
+    /* Code block styling */
     code {
-        background-color: #F0F0F0 !important;
-        color: #000080 !important;
+        background-color: #F0F0F0 !important; /* Light code background */
+        color: #000080 !important; /* Dark blue code text */
         border-radius: 5px;
         padding: 0.2em 0.4em;
     }
@@ -186,36 +184,34 @@ st.markdown(
         overflow-x: auto;
     }
 
-    /* サイドバーのテキスト色を調整 */
+    /* Sidebar text color adjustment */
     .stSidebar [data-testid="stText"],
     .stSidebar [data-testid="stMarkdownContainer"],
     .stSidebar .st-emotion-cache-1jm692h {
         color: #333333;
     }
 
-    /* セレクトボックスのドロップダウンリストの背景色 */
+    /* Selectbox dropdown list background and item colors */
     div[data-baseweb="popover"] > div {
         background-color: #FFFFFF !important;
         color: #333333 !important;
     }
-    /* セレクトボックスのドロップダウンリストのアイテムのテキスト色 */
+    /* Selectbox dropdown list item text color */
     div[data-baseweb="popover"] > div > ul > li {
         color: #333333 !important;
     }
-    /* セレクトボックスのドロップダウンリストのホバー色 */
+    /* Selectbox dropdown list item hover color */
     div[data-baseweb="popover"] > div > ul > li[data-mouse-entered="true"] {
-        background-color: #E0EFFF !important; /* 薄い青 */
-        color: #0000FF !important; /* アクセントの青 */
+        background-color: #E0EFFF !important; /* Light blue */
+        color: #0000FF !important; /* Accent blue */
     }
-
-
     </style>
     """,
     unsafe_allow_html=True
 )
-# --- カスタムCSSの終わり ---
+# --- End of Custom CSS ---
 
-# --- アプリケーション本体（ログイン済みの場合のみ実行） ---
+# --- Application Body (Only executes if user is logged in) ---
 st.title("🧠 バナー広告 採点AI - バナスコ")
 st.subheader("〜もう、無駄打ちしない。広告を“武器”に変えるAIツール〜")
 
@@ -275,11 +271,12 @@ with col1:
             with img_col_a:
                 st.image(Image.open(uploaded_file_a), caption="Aパターン画像", use_container_width=True)
                 if st.button("🚀 Aパターンを採点", key="score_a_btn"):
+                    # Check remaining uses
                     if st.session_state.remaining_uses <= 0:
                         st.warning(f"残り回数がありません。（{st.session_state.plan}プラン）")
                         st.info("利用回数を増やすには、プランのアップグレードが必要です。")
                     else:
-                        # ✅ 利用回数消費の呼び出しを auth_utils.update_user_uses_in_firestore_rest に変更
+                        # Decrement uses in Firestore via auth_utils
                         if auth_utils.update_user_uses_in_firestore_rest(st.session_state["user"], st.session_state["id_token"]): 
                             image_a = Image.open(uploaded_file_a)
                             buf_a = io.BytesIO()
@@ -325,6 +322,7 @@ with col1:
                                     st.session_state.score_a = score_match_a.group(1).strip() if score_match_a else "取得できず"
                                     st.session_state.comment_a = comment_match_a.group(1).strip() if comment_match_a else "取得できず"
 
+                                    # Send data to Google Apps Script (GAS)
                                     data_a = {
                                         "sheet_name": "record_log",
                                         "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -342,7 +340,7 @@ with col1:
                                     try:
                                         response_gas_a = requests.post(GAS_URL, json=data_a)
                                         if response_gas_a.status_code == 200:
-                                            pass
+                                            pass # Success message hidden
                                         else:
                                             st.error(f"❌ スプレッドシート送信エラー（Aパターン）: ステータスコード {response_gas_a.status_code}, 応答: {response_gas_a.text}")
                                     except requests.exceptions.RequestException as e:
@@ -355,7 +353,7 @@ with col1:
                                     st.session_state.score_a = "エラー"
                                     st.session_state.comment_a = "AI応答エラー"
                         else:
-                            st.error("利用回数の更新に失敗しました。")
+                            st.error("利用回数の更新に失敗しました。") # Error message if Firestore update fails
                     st.success("Aパターンの診断が完了しました！")
             
             with result_col_a:
@@ -378,8 +376,7 @@ with col1:
 「OK」「注意あり」どちらかで評価を返してください。
 """
                             try:
-                                # yakijihou_response_a を yakujihou_response_a に修正
-                                yakujihou_response_a = client.chat.completions.create( 
+                                yakujihou_response_a = client.chat.completions.create(
                                     model="gpt-4o",
                                     messages=[
                                         {"role": "system", "content": "あなたは広告表現の専門家です。"},
@@ -388,16 +385,18 @@ with col1:
                                     max_tokens=500,
                                     temperature=0.3,
                                 )
-                                # yakijihou_a を yakujihou_a に修正
+                                # Corrected typo: yakijihou_response_a -> yakujihou_response_a
                                 st.session_state.yakujihou_a = yakujihou_response_a.choices[0].message.content.strip() if yakujihou_response_a.choices else "薬機法チェックの結果を取得できませんでした。" 
-                                # yakijihou_a を yakujihou_a に修正
+                                
+                                # Corrected typo: yakijihou_a -> yakujihou_a
                                 if "OK" in st.session_state.yakujihou_a: 
-                                    st.success(f"薬機法チェック：{st.session_state.yakujihou_a}") # ✅ yakujihou_a に修正
+                                    st.success(f"薬機法チェック：{st.session_state.yakujihou_a}") 
                                 else:
-                                    st.warning(f"薬機法チェック：{st.session_state.yakujihou_a}") # ✅ yakujihou_a に修正
+                                    st.warning(f"薬機法チェック：{st.session_state.yakujihou_a}")
                             except Exception as e:
                                 st.error(f"薬機法チェック中にエラーが発生しました（Aパターン）: {str(e)}")
-                                st.session_state.yakujihou_a = "エラー" # ✅ yakujihou_a に修正
+                                # Corrected typo: yakijihou_a -> yakujihou_a
+                                st.session_state.yakujihou_a = "エラー" 
 
         st.markdown("---")
 
@@ -408,11 +407,12 @@ with col1:
             with img_col_b:
                 st.image(Image.open(uploaded_file_b), caption="Bパターン画像", use_container_width=True)
                 if st.button("🚀 Bパターンを採点", key="score_b_btn"):
+                    # Check remaining uses
                     if st.session_state.remaining_uses <= 0:
                         st.warning(f"残り回数がありません。（{st.session_state.plan}プラン）")
                         st.info("利用回数を増やすには、プランのアップグレードが必要です。")
                     else:
-                        # ✅ 利用回数消費の呼び出しを auth_utils.update_user_uses_in_firestore_rest に変更
+                        # Decrement uses in Firestore via auth_utils
                         if auth_utils.update_user_uses_in_firestore_rest(st.session_state["user"], st.session_state["id_token"]): 
                             image_b = Image.open(uploaded_file_b)
                             buf_b = io.BytesIO()
@@ -458,6 +458,7 @@ with col1:
                                     st.session_state.score_b = score_match_b.group(1).strip() if score_match_b else "取得できず"
                                     st.session_state.comment_b = comment_match_b.group(1).strip() if comment_match_b else "取得できず"
 
+                                    # Send data to Google Apps Script (GAS)
                                     data_b = {
                                         "sheet_name": "record_log",
                                         "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -475,7 +476,7 @@ with col1:
                                     try:
                                         response_gas_b = requests.post(GAS_URL, json=data_b)
                                         if response_gas_b.status_code == 200:
-                                            pass
+                                            pass # Success message hidden
                                         else:
                                             st.error(f"❌ スプレッドシート送信エラー（Bパターン）: ステータスコード {response_gas_b.status_code}, 応答: {response_gas_b.text}")
                                     except requests.exceptions.RequestException as e:
@@ -488,7 +489,7 @@ with col1:
                                     st.session_state.score_b = "エラー"
                                     st.session_state.comment_b = "AI応答エラー"
                         else:
-                            st.error("利用回数の更新に失敗しました。")
+                            st.error("利用回数の更新に失敗しました。") # Error message if Firestore update fails
                     st.success("Bパターンの診断が完了しました！")
 
             with result_col_b:
@@ -511,7 +512,7 @@ with col1:
 「OK」「注意あり」どちらかで評価を返してください。
 """
                             try:
-                                # yakijihou_response_b を yakujihou_response_b に修正
+                                # Corrected typo: yakijihou_response_b -> yakujihou_response_b
                                 yakujihou_response_b = client.chat.completions.create(
                                     model="gpt-4o",
                                     messages=[
@@ -521,16 +522,17 @@ with col1:
                                     max_tokens=500,
                                     temperature=0.3,
                                 )
-                                # yakijihou_b を yakujihou_b に修正
+                                # Corrected typo: yakijihou_b -> yakujihou_b
                                 st.session_state.yakujihou_b = yakujihou_response_b.choices[0].message.content.strip() if yakujihou_response_b.choices else "薬機法チェックの結果を取得できませんでした。" 
-                                # yakijihou_b を yakujihou_b に修正
+                                # Corrected typo: yakijihou_b -> yakujihou_b
                                 if "OK" in st.session_state.yakujihou_b: 
-                                    st.success(f"薬機法チェック：{st.session_state.yakujihou_b}") # ✅ yakujihou_b を yakujihou_b に修正
+                                    st.success(f"薬機法チェック：{st.session_state.yakujihou_b}") 
                                 else:
-                                    st.warning(f"薬機法チェック：{st.session_state.yakujihou_b}") # ✅ yakujihou_b を yakujihou_b に修正
+                                    st.warning(f"薬機法チェック：{st.session_state.yakujihou_b}")
                             except Exception as e:
                                 st.error(f"薬機法チェック中にエラーが発生しました（Bパターン）: {str(e)}")
-                                st.session_state.yakujihou_b = "エラー" # ✅ yakujihou_b を yakujihou_b に修正
+                                # Corrected typo: yakijihou_b -> yakujihou_b
+                                st.session_state.yakujihou_b = "エラー" 
 
         st.markdown("---")
         # AB Test Comparison Function (displayed if both scores are available)
