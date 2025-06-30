@@ -12,7 +12,7 @@ import auth_utils # Import auth_utils.py
 
 
 # Google Apps Script (GAS) and Google Drive information
-GAS_URL = "https://script.google.com/macros/s/AKfycby_uD6Jtb9GT0-atbyPKOPc8uyVKodwYVIQ2Tpe-_E8uTOPiir0Ce1NAPZDEOlCUxN4/exec"
+GAS_URL = "https://script.google.com/macros/s/AKfycby_uD6Jtb9GT0-atbyPKOPc8uyVKodwYVIQ2Tpe-_E8uTOPiir0Ce1NAPZDEOlCUxN4/exec" # ✅ GAS URLを最新のものに更新しました
 
 # Helper function to sanitize values
 def sanitize(value):
@@ -173,8 +173,8 @@ st.markdown(
 
     /* Code block styling */
     code {
-        background-color: #F0F0F0 !important; /* Light code background */
-        color: #000080 !important; /* Dark blue code text */
+        background-color: #F0F0F0 !important;
+        color: #000080 !important;
         border-radius: 5px;
         padding: 0.2em 0.4em;
     }
@@ -277,6 +277,7 @@ with col1:
                         st.info("利用回数を増やすには、プランのアップグレードが必要です。")
                     else:
                         # Decrement uses in Firestore via auth_utils
+                        # Call update_user_uses_in_firestore_rest
                         if auth_utils.update_user_uses_in_firestore_rest(st.session_state["user"], st.session_state["id_token"]): 
                             image_a = Image.open(uploaded_file_a)
                             buf_a = io.BytesIO()
@@ -385,17 +386,14 @@ with col1:
                                     max_tokens=500,
                                     temperature=0.3,
                                 )
-                                # Corrected typo: yakijihou_response_a -> yakujihou_response_a
                                 st.session_state.yakujihou_a = yakujihou_response_a.choices[0].message.content.strip() if yakujihou_response_a.choices else "薬機法チェックの結果を取得できませんでした。" 
                                 
-                                # Corrected typo: yakijihou_a -> yakujihou_a
                                 if "OK" in st.session_state.yakujihou_a: 
                                     st.success(f"薬機法チェック：{st.session_state.yakujihou_a}") 
                                 else:
                                     st.warning(f"薬機法チェック：{st.session_state.yakujihou_a}")
                             except Exception as e:
                                 st.error(f"薬機法チェック中にエラーが発生しました（Aパターン）: {str(e)}")
-                                # Corrected typo: yakijihou_a -> yakujihou_a
                                 st.session_state.yakujihou_a = "エラー" 
 
         st.markdown("---")
@@ -407,12 +405,16 @@ with col1:
             with img_col_b:
                 st.image(Image.open(uploaded_file_b), caption="Bパターン画像", use_container_width=True)
                 if st.button("🚀 Bパターンを採点", key="score_b_btn"):
-                    # Check remaining uses
-                    if st.session_state.remaining_uses <= 0:
+                    # Add plan-based restriction for B-pattern here
+                    if st.session_state.plan == "Free": # Check if user is on Free plan
+                        st.warning("この機能はFreeプランではご利用いただけません。")
+                        st.info("Bパターン診断はLightプラン以上でご利用可能です。プランのアップグレードをご検討ください。")
+                    elif st.session_state.remaining_uses <= 0:
                         st.warning(f"残り回数がありません。（{st.session_state.plan}プラン）")
                         st.info("利用回数を増やすには、プランのアップグレードが必要です。")
                     else:
                         # Decrement uses in Firestore via auth_utils
+                        # Call update_user_uses_in_firestore_rest
                         if auth_utils.update_user_uses_in_firestore_rest(st.session_state["user"], st.session_state["id_token"]): 
                             image_b = Image.open(uploaded_file_b)
                             buf_b = io.BytesIO()
@@ -512,7 +514,6 @@ with col1:
 「OK」「注意あり」どちらかで評価を返してください。
 """
                             try:
-                                # Corrected typo: yakijihou_response_b -> yakujihou_response_b
                                 yakujihou_response_b = client.chat.completions.create(
                                     model="gpt-4o",
                                     messages=[
@@ -522,16 +523,14 @@ with col1:
                                     max_tokens=500,
                                     temperature=0.3,
                                 )
-                                # Corrected typo: yakijihou_b -> yakujihou_b
                                 st.session_state.yakujihou_b = yakujihou_response_b.choices[0].message.content.strip() if yakujihou_response_b.choices else "薬機法チェックの結果を取得できませんでした。" 
-                                # Corrected typo: yakijihou_b -> yakujihou_b
+                                
                                 if "OK" in st.session_state.yakujihou_b: 
                                     st.success(f"薬機法チェック：{st.session_state.yakujihou_b}") 
                                 else:
                                     st.warning(f"薬機法チェック：{st.session_state.yakujihou_b}")
                             except Exception as e:
                                 st.error(f"薬機法チェック中にエラーが発生しました（Bパターン）: {str(e)}")
-                                # Corrected typo: yakijihou_b -> yakujihou_b
                                 st.session_state.yakujihou_b = "エラー" 
 
         st.markdown("---")
