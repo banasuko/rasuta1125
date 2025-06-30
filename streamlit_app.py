@@ -12,7 +12,7 @@ import auth_utils # ✅ auth_utils.py をインポート
 
 
 # GASとGoogle Driveの情報
-GAS_URL = "https://script.google.com/macros/s/AKfycbzUy3JI5xwncRHxv-WoHHNqiF7LLndhHTOzmLOHtNRJ2hNCo8PJi7-0fdbDjnfAGMlL/exec"
+GAS_URL = "https://script.google.com/macros/s/AKfycbzcrcsOUGxabxaIJ-Dhh__tfbeELmVuIH_E7U3h_riDoRZirjC563MxZdzWsQkzhVbG/exec"
 
 # Helper function to sanitize values
 def sanitize(value):
