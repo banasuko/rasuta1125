@@ -33,7 +33,7 @@ st.title("📸 バナー画像からコピー案を生成")
 uploaded_image = st.file_uploader("バナー画像をアップロード", type=["jpg", "png"])
 if uploaded_image:
     image = Image.open(uploaded_image)
-    st.image(image, caption="アップロードされた画像", use_container_width=True)
+    st.image(image, caption="アップロードされた画像", use_container_width=True) # Changed to use_container_width
 
 # 2. カテゴリー選択
 category = st.selectbox("カテゴリーを選択", [
@@ -51,39 +51,49 @@ tone = st.selectbox("トーン（雰囲気）を選択", ["親しみやすい", 
 user_plan = st.session_state.get("plan", "Free") 
 
 # Determine max copy count based on plan
-max_copy_count = 0
+max_copy_count_per_request = 0 # Default for Free/Guest
+copy_count_options_available = []
+
 if user_plan == "Light":
-    max_copy_count = 3
+    max_copy_count_per_request = 3
+    copy_count_options_available = [1, 2, 3] # Can generate 1, 2, or 3
 elif user_plan == "Pro":
-    max_copy_count = 5
+    max_copy_count_per_request = 5
+    copy_count_options_available = [1, 2, 3, 4, 5]
 elif user_plan in ["Team", "Enterprise"]: # Team and Enterprise
-    max_copy_count = 10 # Assuming 10 for Team/Enterprise based on document
+    max_copy_count_per_request = 10 
+    copy_count_options_available = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 else: # Free or Guest plan
-    max_copy_count = 0 # Free plan cannot generate copies
+    max_copy_count_per_request = 0 # Free plan cannot generate copies
+    copy_count_options_available = [0] # To prevent errors in selectbox if no options
 
-# Options for selectbox, up to max_copy_count
-copy_count_options = [i for i in [2, 5, 10] if i <= max_copy_count]
-if not copy_count_options and max_copy_count > 0: # If max_copy_count is not 0 but none of 2,5,10 fit
-    copy_count_options = [max_copy_count] # Default to max if specific options don't fit
-
-if not copy_count_options: # If max_copy_count is 0 (Free/Guest)
-    st.warning(f"コピー生成機能は{user_plan}プランではご利用いただけません。")
+# Display appropriate message and selectbox
+if user_plan == "Free":
+    st.warning("この機能はFreeプランではご利用いただけません。")
     st.info("コピー生成機能はLightプラン以上でご利用可能です。")
     copy_count = 0 # Ensure copy_count is 0 to prevent generation
+elif not copy_count_options_available: # Should not happen if logic is correct, but for safety
+    st.warning("現在、選択可能なコピー生成数がありません。")
+    copy_count = 0
 else:
-    copy_count = st.selectbox("コピー生成数を選んでください (プラン上限: " + str(max_copy_count) + "案)", copy_count_options, index=0)
-
+    copy_count = st.selectbox(
+        f"コピー生成数を選んでください (プラン上限: {max_copy_count_per_request}案)", 
+        copy_count_options_available, 
+        index=0 if 0 in copy_count_options_available else (copy_count_options_available.index(2) if 2 in copy_count_options_available else 0)
+    )
 
 # 5. 生成ボタン
 if st.button("コピーを生成する"):
     # First, check if the user can use this feature at all based on plan
-    if user_plan == "Free" or max_copy_count == 0:
+    if user_plan == "Free":
         st.warning("この機能はFreeプランではご利用いただけません。")
         st.info("コピー生成機能はLightプラン以上でご利用可能です。プランのアップグレードをご検討ください。")
     # Then, check remaining uses
     elif st.session_state.remaining_uses <= 0:
         st.warning(f"残り回数がありません。（{st.session_state.plan}プラン）")
         st.info("利用回数を増やすには、プランのアップグレードが必要です。")
+    elif copy_count == 0: # If copy_count is 0 due to no options
+        st.warning("コピー生成数が選択されていません。")
     else:
         # If plan allows and uses are available, proceed to consume and generate
         if auth_utils.update_user_uses_in_firestore_rest(st.session_state["user"], st.session_state["id_token"]): # Consume 1 use
@@ -126,5 +136,4 @@ if st.button("コピーを生成する"):
                     st.error(f"コピー生成中にエラーが発生しました：{e}")
         else:
             st.error("利用回数の更新に失敗しました。コピー生成は実行されませんでした。")
-
 
