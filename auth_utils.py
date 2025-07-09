@@ -4,7 +4,7 @@ import os
 import requests
 from dotenv import load_dotenv
 import firebase_admin
-from firebase_admin import credentials, firestore, storage # ✅ storage を追加
+from firebase_admin import credentials, firestore, storage 
 import json
 from datetime import datetime
 
@@ -22,7 +22,7 @@ if not FIREBASE_API_KEY:
 # Firebase Authentication REST APIのエンドポイントベースURL
 FIREBASE_AUTH_BASE_URL = "https://identitytoolkit.googleapis.com/v1/accounts:"
 # Firestore REST APIのエンドポイントベースURL
-FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID") # .envに設定されているはず
+FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID")
 
 if not FIREBASE_PROJECT_ID:
     st.error("FirebaseプロジェクトIDが.envファイルに見つかりません。")
@@ -37,7 +37,6 @@ try:
         admin_project_id = os.getenv("FIREBASE_PROJECT_ID_ADMIN")
         admin_private_key = os.getenv("FIREBASE_PRIVATE_KEY_ADMIN")
         admin_client_email = os.getenv("FIREBASE_CLIENT_EMAIL_ADMIN")
-        # Storageのバケット名も必要 (通常は projectId.appspot.com)
         storage_bucket = os.getenv("FIREBASE_STORAGE_BUCKET") 
 
         if not admin_project_id or not admin_private_key or not admin_client_email or not storage_bucket:
@@ -59,10 +58,9 @@ try:
         }
         
         cred = credentials.Certificate(service_account_info)
-        # Storageバケット名を指定して初期化
         firebase_admin.initialize_app(cred, {'storageBucket': storage_bucket})
         st.session_state.firebase_admin_initialized = True
-        db = firestore.client() # Firestoreクライアントを初期化
+        db = firestore.client()
 except Exception as e:
     st.error(f"Firebase Admin SDKの初期化に失敗しました。サービスアカウントキーを確認してください: {e}")
     st.error(f"エラー詳細: {e}")
@@ -82,7 +80,7 @@ if "plan" not in st.session_state:
     st.session_state.plan = "Guest"
 if "remaining_uses" not in st.session_state:
     st.session_state.remaining_uses = 0
-if "firebase_initialized" not in st.session_state: # Auth APIのみ使うため、初期化は成功とみなす
+if "firebase_initialized" not in st.session_state:
     st.session_state.firebase_initialized = True
 
 
@@ -148,9 +146,10 @@ def update_user_uses_in_firestore_rest(uid, id_token, uses_to_deduct=1):
         return True
     except Exception as e:
         st.error(f"利用回数の更新に失敗しました: {e}")
+        st.error(f"利用回数更新エラー詳細: {e}") # ✅ この行を追加
         return False
 
-# ✅ 追加: Firebase Storageへの画像アップロード関数
+# ✅ Firebase Storageへの画像アップロード関数
 def upload_image_to_firebase_storage(uid, image_bytes_io, filename):
     """
     画像をFirebase Storageにアップロードし、公開URLを返す。
@@ -163,23 +162,20 @@ def upload_image_to_firebase_storage(uid, image_bytes_io, filename):
     """
     try:
         bucket = storage.bucket() # Firebase Admin SDKで初期化されたStorageバケットを取得
-        # ユーザーIDごとのフォルダに画像を保存
         blob = bucket.blob(f"users/{uid}/diagnoses_images/{filename}")
         
-        # BytesIOから直接アップロード
-        image_bytes_io.seek(0) # ストリームの先頭に戻す
-        blob.upload_from_file(image_bytes_io, content_type="image/png") # content_typeを明示
+        image_bytes_io.seek(0)
+        blob.upload_from_file(image_bytes_io, content_type="image/png")
 
-        # 公開アクセスを許可 (Storageのルール設定も必要)
-        # 通常は認証されたアクセスが推奨されるが、ここでは公開URLを取得
         blob.make_public() 
         
         return blob.public_url
     except Exception as e:
         st.error(f"Firebase Storageへの画像アップロードに失敗しました: {e}")
+        st.error(f"Storageアップロードエラー詳細: {e}") # ✅ この行を追加
         return None
 
-# ✅ 追加: 診断記録をFirestoreに書き込む関数 (image_urlを引数に追加)
+# ✅ 診断記録をFirestoreに書き込む関数 (image_urlを引数に追加)
 def add_diagnosis_record_to_firestore(uid, id_token, record_data, image_url=None):
     """
     ユーザーの診断記録をFirestoreのdiagnosesサブコレクションに追加する。
@@ -195,15 +191,15 @@ def add_diagnosis_record_to_firestore(uid, id_token, record_data, image_url=None
     doc_ref = db.collection('users').document(uid).collection('diagnoses').document()
     
     try:
-        # 記録データに画像URLとタイムスタンプを追加
         if image_url:
             record_data["image_url"] = image_url
-        record_data["created_at"] = firestore.SERVER_TIMESTAMP # Firestore側でタイムスタンプを生成
-
+        record_data["created_at"] = firestore.SERVER_TIMESTAMP
+        
         doc_ref.set(record_data) 
         return True
     except Exception as e:
         st.error(f"診断記録のFirestore保存に失敗しました: {e}")
+        st.error(f"Firestore記録エラー詳細: {e}") # ✅ この行を追加
         return False
 
 
@@ -287,11 +283,9 @@ def check_login():
     ユーザーのログイン状態をチェックし、未ログインならログインページを表示してアプリの実行を停止する。
     Firestoreの残り回数も確認し、サイドバーに表示する。
     """
-    # Admin SDKの初期化状態を確認
     if not st.session_state.get("firebase_admin_initialized"):
         st.stop() 
 
-    # サイドバーに現在のユーザー名とログアウトボタン、残り回数を配置
     if st.session_state.get("logged_in"):
         st.sidebar.write(f"ようこそ, {st.session_state.get('email')}!")
         
