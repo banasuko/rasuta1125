@@ -11,8 +11,10 @@ from openai import OpenAI
 import auth_utils # Import auth_utils.py
 
 
-# Google Apps Script (GAS) and Google Drive information
-GAS_URL = "https://script.google.com/macros/s/AKfycby_uD6Jtb9GT0-atbyPKOPc8uyVKodwYVIQ2Tpe-_E8uTOPiir0Ce1NAPZDEOlCUxN4/exec" # ✅ GAS URLを最新のものに更新しました
+# Google Apps Script (GAS) and Google Drive information (GAS for legacy spreadsheet, will be removed later if not needed)
+# GASへの送信はFirestore移行後は不要になりますが、念のためURLは残します。
+GAS_URL = "https://script.google.com/macros/s/AKfycby_uD6Jtb9GT0-atbyPKOPc8uyVKodwYVIQ2Tpe-_E8uTOPiir0Ce1NAPZDEOlCUxN4/exec" # This URL is still here for spreadsheet backup for now
+
 
 # Helper function to sanitize values
 def sanitize(value):
@@ -132,7 +134,7 @@ st.markdown(
     div[data-baseweb="input"]:focus-within,
     div[data-baseweb="select"]:focus-within,
     div[data-baseweb="textarea"]:focus-within {
-        border-color: #0000FF; /* Accent blue on focus */
+        border-color: #0000FF;
         box-shadow: 0 0 0 2px rgba(0, 0, 255, 0.3);
     }
 
@@ -155,20 +157,20 @@ st.markdown(
         color: #333333;
     }
     .stAlert.stAlert-info {
-        background-color: #E0EFFF; /* Light blue */
-        border-left-color: #0000FF; /* Dark blue border */
+        background-color: #E0EFFF;
+        border-left-color: #0000FF;
     }
     .stAlert.stAlert-success {
-        background-color: #E0FFE0; /* Light green */
-        border-left-color: #00AA00; /* Standard green */
+        background-color: #E0FFE0;
+        border-left-color: #00AA00;
     }
     .stAlert.stAlert-warning {
-        background-color: #FFFBE0; /* Light yellow */
-        border-left-color: #FFD700; /* Vibrant yellow */
+        background-color: #FFFBE0;
+        border-left-color: #FFD700;
     }
     .stAlert.stAlert-error {
-        background-color: #FFE0E0; /* Light red */
-        border-left-color: #FF0000; /* Vibrant red */
+        background-color: #FFE0E0;
+        border-left-color: #FF0000;
     }
 
     /* Code block styling */
@@ -279,14 +281,21 @@ with col1:
                         # Decrement uses in Firestore via auth_utils
                         # Call update_user_uses_in_firestore_rest
                         if auth_utils.update_user_uses_in_firestore_rest(st.session_state["user"], st.session_state["id_token"]): 
-                            image_a = Image.open(uploaded_file_a)
-                            buf_a = io.BytesIO()
-                            image_a.save(buf_a, format="PNG")
-                            img_str_a = base64.b64encode(buf_a.getvalue()).decode()
+                            image_a_bytes = io.BytesIO() # Create BytesIO object for image
+                            Image.open(uploaded_file_a).save(image_a_bytes, format="PNG") # Save uploaded image to BytesIO
+                            image_filename_a = f"banner_A_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
+                            
+                            # Upload image to Firebase Storage
+                            image_url_a = auth_utils.upload_image_to_firebase_storage(
+                                st.session_state["user"], 
+                                image_a_bytes, 
+                                image_filename_a
+                            )
 
-                            with st.spinner("AIがAパターンを採点中です..."):
-                                try:
-                                    ai_prompt_text = f"""
+                            if image_url_a: # Proceed if image upload was successful
+                                with st.spinner("AIがAパターンを採点中です..."):
+                                    try:
+                                        ai_prompt_text = f"""
 以下のバナー画像をプロ視点で採点してください。
 この広告のターゲット年代は「{age_group}」で、主な目的は「{purpose}」です。
 
@@ -304,55 +313,58 @@ with col1:
 スコア：{score_format}
 改善コメント：2～3行でお願いします
 ---"""
-                                    response_a = client.chat.completions.create(
-                                        model="gpt-4o",
-                                        messages=[
-                                            {"role": "system", "content": "あなたは広告のプロです。"},
-                                            {"role": "user", "content": [
-                                                {"type": "text", "text": ai_prompt_text},
-                                                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str_a}"}}
-                                            ]}
-                                        ],
-                                        max_tokens=600
-                                    )
-                                    content_a = response_a.choices[0].message.content
-                                    st.session_state.ai_response_a = content_a
+                                        # Use base64 string for OpenAI Vision API
+                                        img_str_a = base64.b64encode(image_a_bytes.getvalue()).decode()
+                                        response_a = client.chat.completions.create(
+                                            model="gpt-4o",
+                                            messages=[
+                                                {"role": "system", "content": "あなたは広告のプロです。"},
+                                                {"role": "user", "content": [
+                                                    {"type": "text", "text": ai_prompt_text},
+                                                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str_a}"}}
+                                                ]}
+                                            ],
+                                            max_tokens=600
+                                        )
+                                        content_a = response_a.choices[0].message.content
+                                        st.session_state.ai_response_a = content_a
 
-                                    score_match_a = re.search(r"スコア[:：]\s*(.+)", content_a)
-                                    comment_match_a = re.search(r"改善コメント[:：]\s*(.+)", content_a)
-                                    st.session_state.score_a = score_match_a.group(1).strip() if score_match_a else "取得できず"
-                                    st.session_state.comment_a = comment_match_a.group(1).strip() if comment_match_a else "取得できず"
+                                        score_match_a = re.search(r"スコア[:：]\s*(.+)", content_a)
+                                        comment_match_a = re.search(r"改善コメント[:：]\s*(.+)", content_a)
+                                        st.session_state.score_a = score_match_a.group(1).strip() if score_match_a else "取得できず"
+                                        st.session_state.comment_a = comment_match_a.group(1).strip() if comment_match_a else "取得できず"
 
-                                    # Send data to Google Apps Script (GAS)
-                                    data_a = {
-                                        "sheet_name": "record_log",
-                                        "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                                        "platform": sanitize(platform),
-                                        "category": sanitize(category),
-                                        "industry": sanitize(industry),
-                                        "age_group": sanitize(age_group),
-                                        "purpose": sanitize(purpose),
-                                        "score": sanitize(st.session_state.score_a),
-                                        "comment": sanitize(st.session_state.comment_a),
-                                        "result": sanitize(result_input),
-                                        "follower_gain": sanitize(follower_gain_input),
-                                        "memo": sanitize(memo_input),
-                                    }
-                                    try:
-                                        response_gas_a = requests.post(GAS_URL, json=data_a)
-                                        if response_gas_a.status_code == 200:
-                                            pass # Success message hidden
+                                        # Prepare data for Firestore
+                                        firestore_record_data = {
+                                            "timestamp": datetime.now().isoformat() + "Z", # ISO 8601 format for Firestore timestamp
+                                            "platform": sanitize(platform),
+                                            "category": sanitize(category),
+                                            "industry": sanitize(industry),
+                                            "age_group": sanitize(age_group),
+                                            "purpose": sanitize(purpose),
+                                            "score": sanitize(st.session_state.score_a),
+                                            "comment": sanitize(st.session_state.comment_a),
+                                            "result": sanitize(result_input), # User-entered arbitrary AI eval result
+                                            "follower_gain": sanitize(follower_gain_input),
+                                            "memo": sanitize(memo_input),
+                                            "image_url": image_url_a # Add image URL to Firestore data
+                                        }
+                                        # Send data to Firestore
+                                        if auth_utils.add_diagnosis_record_to_firestore(
+                                            st.session_state["user"], 
+                                            st.session_state["id_token"], 
+                                            firestore_record_data
+                                        ):
+                                            st.success("📊 診断結果をFirestoreに記録しました！")
                                         else:
-                                            st.error(f"❌ スプレッドシート送信エラー（Aパターン）: ステータスコード {response_gas_a.status_code}, 応答: {response_gas_a.text}")
-                                    except requests.exceptions.RequestException as e:
-                                        st.error(f"GASへのデータ送信中にネットワークエラーが発生しました（Aパターン）: {str(e)}")
-                                    except Exception as e:
-                                        st.error(f"GASへのデータ送信中に予期せぬエラーが発生しました（Aパターン）: {str(e)}")
+                                            st.error("❌ 診断結果のFirestore記録に失敗しました。")
 
-                                except Exception as e:
-                                    st.error(f"AI採点中にエラーが発生しました（Aパターン）: {str(e)}")
-                                    st.session_state.score_a = "エラー"
-                                    st.session_state.comment_a = "AI応答エラー"
+                                    except Exception as e:
+                                        st.error(f"AI採点中にエラーが発生しました（Aパターン）: {str(e)}")
+                                        st.session_state.score_a = "エラー"
+                                        st.session_state.comment_a = "AI応答エラー"
+                            else:
+                                st.error("画像アップロードに失敗したため、採点を行いませんでした。")
                         else:
                             st.error("利用回数の更新に失敗しました。") # Error message if Firestore update fails
                     st.success("Aパターンの診断が完了しました！")
@@ -416,14 +428,21 @@ with col1:
                         # Decrement uses in Firestore via auth_utils
                         # Call update_user_uses_in_firestore_rest
                         if auth_utils.update_user_uses_in_firestore_rest(st.session_state["user"], st.session_state["id_token"]): 
-                            image_b = Image.open(uploaded_file_b)
-                            buf_b = io.BytesIO()
-                            image_b.save(buf_b, format="PNG")
-                            img_str_b = base64.b64encode(buf_b.getvalue()).decode()
+                            image_b_bytes = io.BytesIO() # Create BytesIO object for image
+                            Image.open(uploaded_file_b).save(image_b_bytes, format="PNG") # Save uploaded image to BytesIO
+                            image_filename_b = f"banner_B_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
+                            
+                            # Upload image to Firebase Storage
+                            image_url_b = auth_utils.upload_image_to_firebase_storage(
+                                st.session_state["user"], 
+                                image_b_bytes, 
+                                image_filename_b
+                            )
 
-                            with st.spinner("AIがBパターンを採点中です..."):
-                                try:
-                                    ai_prompt_text = f"""
+                            if image_url_b: # Proceed if image upload was successful
+                                with st.spinner("AIがBパターンを採点中です..."):
+                                    try:
+                                        ai_prompt_text = f"""
 以下のバナー画像をプロ視点で採点してください。
 この広告のターゲット年代は「{age_group}」で、主な目的は「{purpose}」です。
 
@@ -441,50 +460,51 @@ with col1:
 スコア：{score_format}
 改善コメント：2～3行でお願いします
 ---"""
-                                    response_b = client.chat.completions.create(
-                                        model="gpt-4o",
-                                        messages=[
-                                            {"role": "system", "content": "あなたは広告のプロです。"},
-                                            {"role": "user", "content": [
-                                                {"type": "text", "text": ai_prompt_text},
-                                                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str_b}"}}
-                                            ]}
-                                        ],
-                                        max_tokens=600
-                                    )
-                                    content_b = response_b.choices[0].message.content
-                                    st.session_state.ai_response_b = content_b
+                                        # Use base64 string for OpenAI Vision API
+                                        img_str_b = base64.b64encode(image_b_bytes.getvalue()).decode()
+                                        response_b = client.chat.completions.create(
+                                            model="gpt-4o",
+                                            messages=[
+                                                {"role": "system", "content": "あなたは広告のプロです。"},
+                                                {"role": "user", "content": [
+                                                    {"type": "text", "text": ai_prompt_text},
+                                                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str_b}"}}
+                                                ]}
+                                            ],
+                                            max_tokens=600
+                                        )
+                                        content_b = response_b.choices[0].message.content
+                                        st.session_state.ai_response_b = content_b
 
-                                    score_match_b = re.search(r"スコア[:：]\s*(.+)", content_b)
-                                    comment_match_b = re.search(r"改善コメント[:：]\s*(.+)", content_b)
-                                    st.session_state.score_b = score_match_b.group(1).strip() if score_match_b else "取得できず"
-                                    st.session_state.comment_b = comment_match_b.group(1).strip() if comment_match_b else "取得できず"
+                                        score_match_b = re.search(r"スコア[:：]\s*(.+)", content_b)
+                                        comment_match_b = re.search(r"改善コメント[:：]\s*(.+)", content_b)
+                                        st.session_state.score_b = score_match_b.group(1).strip() if score_match_b else "取得できず"
+                                        st.session_state.comment_b = comment_match_b.group(1).strip() if comment_match_b else "取得できず"
 
-                                    # Send data to Google Apps Script (GAS)
-                                    data_b = {
-                                        "sheet_name": "record_log",
-                                        "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                                        "platform": sanitize(platform),
-                                        "category": sanitize(category),
-                                        "industry": sanitize(industry),
-                                        "age_group": sanitize(age_group),
-                                        "purpose": sanitize(purpose),
-                                        "score": sanitize(st.session_state.score_b),
-                                        "comment": sanitize(st.session_state.comment_b),
-                                        "result": sanitize(result_input),
-                                        "follower_gain": sanitize(follower_gain_input),
-                                        "memo": sanitize(memo_input),
-                                    }
-                                    try:
-                                        response_gas_b = requests.post(GAS_URL, json=data_b)
-                                        if response_gas_b.status_code == 200:
-                                            pass # Success message hidden
+                                        # Prepare data for Firestore
+                                        firestore_record_data = {
+                                            "timestamp": datetime.now().isoformat() + "Z", # ISO 8601 format for Firestore timestamp
+                                            "platform": sanitize(platform),
+                                            "category": sanitize(category),
+                                            "industry": sanitize(industry),
+                                            "age_group": sanitize(age_group),
+                                            "purpose": sanitize(purpose),
+                                            "score": sanitize(st.session_state.score_b),
+                                            "comment": sanitize(st.session_state.comment_b),
+                                            "result": sanitize(result_input), # User-entered arbitrary AI eval result
+                                            "follower_gain": sanitize(follower_gain_input),
+                                            "memo": sanitize(memo_input),
+                                            "image_url": image_url_b # Add image URL to Firestore data
+                                        }
+                                        # Send data to Firestore
+                                        if auth_utils.add_diagnosis_record_to_firestore(
+                                            st.session_state["user"], 
+                                            st.session_state["id_token"], 
+                                            firestore_record_data
+                                        ):
+                                            st.success("📊 診断結果をFirestoreに記録しました！")
                                         else:
-                                            st.error(f"❌ スプレッドシート送信エラー（Bパターン）: ステータスコード {response_gas_b.status_code}, 応答: {response_gas_b.text}")
-                                    except requests.exceptions.RequestException as e:
-                                        st.error(f"GASへのデータ送信中にネットワークエラーが発生しました（Bパターン）: {str(e)}")
-                                    except Exception as e:
-                                        st.error(f"GASへのデータ送信中に予期せぬエラーが発生しました（Bパターン）: {str(e)}")
+                                            st.error("❌ 診断結果のFirestore記録に失敗しました。")
 
                                 except Exception as e:
                                     st.error(f"AI採点中にエラーが発生しました（Bパターン）: {str(e)}")
@@ -523,7 +543,7 @@ with col1:
                                     max_tokens=500,
                                     temperature=0.3,
                                 )
-                                st.session_state.yakujihou_b = yakujihou_response_b.choices[0].message.content.strip() if yakujihou_response_b.choices else "薬機法チェックの結果を取得できませんでした。" 
+                                st.session_state.yakujihou_b = yakijihou_response_b.choices[0].message.content.strip() if yakijihou_response_b.choices else "薬機法チェックの結果を取得できませんでした。" 
                                 
                                 if "OK" in st.session_state.yakujihou_b: 
                                     st.success(f"薬機法チェック：{st.session_state.yakujihou_b}") 
