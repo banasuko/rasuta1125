@@ -4,9 +4,9 @@ import os
 import requests
 from dotenv import load_dotenv
 import firebase_admin
-from firebase_admin import credentials, firestore, storage
+from firebase_admin import credentials, firestore
 import json
-from datetime import datetime
+from datetime import datetime # Firestore REST APIでタイムスタンプを扱うために追加
 
 
 # .envファイルから環境変数を読み込む
@@ -21,26 +21,16 @@ if not FIREBASE_API_KEY:
 
 # Firebase Authentication REST APIのエンドポイントベースURL
 FIREBASE_AUTH_BASE_URL = "https://identitytoolkit.googleapis.com/v1/accounts:"
-# Firestore REST APIのエンドポイントベースURL
-FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID")
 
-if not FIREBASE_PROJECT_ID:
-    st.error("FirebaseプロジェクトIDが.envファイルに見つかりません。")
-    st.stop()
-
-FIREBASE_FIRESTORE_BASE_URL = f"https://firestore.googleapis.com/v1/projects/{FIREBASE_PROJECT_ID}/databases/(default)/documents/"
-
-
-# --- Firebase Admin SDKの初期化 (Firestore & Storage用) ---
+# --- Firebase Admin SDKの初期化 (Firestore用) ---
 try:
     if "firebase_admin_initialized" not in st.session_state:
         admin_project_id = os.getenv("FIREBASE_PROJECT_ID_ADMIN")
         admin_private_key = os.getenv("FIREBASE_PRIVATE_KEY_ADMIN")
         admin_client_email = os.getenv("FIREBASE_CLIENT_EMAIL_ADMIN")
-        storage_bucket = os.getenv("FIREBASE_STORAGE_BUCKET") 
 
-        if not admin_project_id or not admin_private_key or not admin_client_email or not storage_bucket:
-            st.error("Firebase Admin SDKの環境変数（PROJECT_ID_ADMIN, PRIVATE_KEY_ADMIN, CLIENT_EMAIL_ADMIN, STORAGE_BUCKET）が不足しています。Secretsを確認してください。")
+        if not admin_project_id or not admin_private_key or not admin_client_email:
+            st.error("Firebase Admin SDKの環境変数（PROJECT_ID_ADMIN, PRIVATE_KEY_ADMIN, CLIENT_EMAIL_ADMIN）が不足しています。Secretsを確認してください。")
             st.stop()
 
         service_account_info = {
@@ -58,7 +48,7 @@ try:
         }
         
         cred = credentials.Certificate(service_account_info)
-        firebase_admin.initialize_app(cred, {'storageBucket': storage_bucket})
+        firebase_admin.initialize_app(cred)
         st.session_state.firebase_admin_initialized = True
         db = firestore.client()
 except Exception as e:
@@ -74,20 +64,15 @@ if "user" not in st.session_state:
     st.session_state.user = None
 if "email" not in st.session_state:
     st.session_state.email = None
-if "id_token" not in st.session_state:
-    st.session_state.id_token = None
 if "plan" not in st.session_state:
     st.session_state.plan = "Guest"
 if "remaining_uses" not in st.session_state:
     st.session_state.remaining_uses = 0
-if "firebase_initialized" not in st.session_state:
-    st.session_state.firebase_initialized = True
 
 
 # --- Firebase Authentication REST APIの関数 ---
 def sign_in_with_email_and_password(email, password):
-    """Firebase REST API を使ってメールとパスワードでサインインする"""
-    url = f"{FIREBASE_AUTH_BASE_URL}signInWithPassword?key={FIREBASE_API_KEY}"
+    url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={FIREBASE_API_KEY}"
     headers = {"Content-Type": "application/json"}
     data = {
         "email": email,
@@ -99,8 +84,7 @@ def sign_in_with_email_and_password(email, password):
     return response.json()
 
 def create_user_with_email_and_password(email, password):
-    """Firebase REST API を使ってメールとパスワードでユーザーを作成する"""
-    url = f"{FIREBASE_AUTH_BASE_URL}signUp?key={FIREBASE_API_KEY}"
+    url = f"https://identitytoolkit.googleapis.com/v1/accounts:signUp?key={FIREBASE_API_KEY}"
     headers = {"Content-Type": "application/json"}
     data = {
         "email": email,
@@ -113,8 +97,8 @@ def create_user_with_email_and_password(email, password):
 
 
 # --- Firestoreの操作関数 (Admin SDKを使用) ---
-def get_user_data_from_firestore(uid, id_token):
-    """Firestoreからユーザーのプランと利用回数を取得する (IDトークン認証)"""
+def get_user_data_from_firestore(uid):
+    """Firestoreからユーザーのプランと利用回数を取得する"""
     global db 
     doc_ref = db.collection('users').document(uid)
     doc = doc_ref.get()
@@ -132,10 +116,10 @@ def get_user_data_from_firestore(uid, id_token):
             "created_at": firestore.SERVER_TIMESTAMP
         })
     st.sidebar.write(f"残り回数: {st.session_state.remaining_uses}回 ({st.session_state.plan}プラン)")
-    return True
 
-def update_user_uses_in_firestore_rest(uid, id_token, uses_to_deduct=1):
-    """Firestoreのユーザー利用回数を減らす (IDトークン認証)"""
+
+def update_user_uses_in_firestore(uid, uses_to_deduct=1):
+    """Firestoreのユーザー利用回数を減らす"""
     global db
     doc_ref = db.collection('users').document(uid)
     try:
@@ -148,60 +132,6 @@ def update_user_uses_in_firestore_rest(uid, id_token, uses_to_deduct=1):
         return True
     except Exception as e:
         st.error(f"利用回数の更新に失敗しました: {e}")
-        st.error(f"利用回数更新エラー詳細: {e}")
-        return False
-
-# Firebase Storageへの画像アップロード関数
-def upload_image_to_firebase_storage(uid, image_bytes_io, filename):
-    """
-    画像をFirebase Storageにアップロードし、公開URLを返す。
-    Args:
-        uid (str): ユーザーID (画像をユーザーフォルダに整理するため)
-        image_bytes_io (io.BytesIO): PIL ImageをBytesIOに変換したデータ
-        filename (str): 保存するファイル名 (例: banner_A_YYYYMMDDHHMMSS.png)
-    Returns:
-        str: アップロードされた画像の公開URL, またはNone (失敗時)
-    """
-    try:
-        bucket = storage.bucket()
-        blob = bucket.blob(f"users/{uid}/diagnoses_images/{filename}")
-        
-        image_bytes_io.seek(0)
-        blob.upload_from_file(image_bytes_io, content_type="image/png")
-
-        blob.make_public() 
-        
-        return blob.public_url
-    except Exception as e:
-        st.error(f"Firebase Storageへの画像アップロードに失敗しました: {e}")
-        st.error(f"Storageアップロードエラー詳細: {e}")
-        return None
-
-# 診断記録をFirestoreに書き込む関数 (image_urlを引数に追加)
-def add_diagnosis_record_to_firestore(uid, id_token, record_data, image_url=None):
-    """
-    ユーザーの診断記録をFirestoreのdiagnosesサブコレクションに追加する。
-    Args:
-        uid (str): ユーザーID
-        id_token (str): ユーザーのIDトークン
-        record_data (dict): 記録したい診断データ
-        image_url (str, optional): アップロードされた画像のURL. Defaults to None.
-    Returns:
-        bool: 成功すればTrue, 失敗すればFalse
-    """
-    global db
-    doc_ref = db.collection('users').document(uid).collection('diagnoses').document()
-    
-    try:
-        if image_url:
-            record_data["image_url"] = image_url
-        record_data["created_at"] = firestore.SERVER_TIMESTAMP
-        
-        doc_ref.set(record_data) 
-        return True
-    except Exception as e:
-        st.error(f"診断記録のFirestore保存に失敗しました: {e}")
-        st.error(f"Firestore記録エラー詳細: {e}")
         return False
 
 
@@ -224,9 +154,8 @@ def login_page():
                     st.session_state["user"] = user_info["localId"]
                     st.session_state["email"] = user_info["email"]
                     st.session_state["logged_in"] = True
-                    st.session_state["id_token"] = user_info["idToken"]
                     
-                    get_user_data_from_firestore(st.session_state["user"], st.session_state["id_token"])
+                    get_user_data_from_firestore(st.session_state["user"])
 
                     st.success(f"ログインしました: {user_info['email']}")
                     st.rerun()
@@ -247,15 +176,7 @@ def login_page():
             with st.spinner("アカウント作成中..."):
                 try:
                     user_info = create_user_with_email_and_password(email, password)
-                    st.session_state["user"] = user_info["localId"]
-                    st.session_state["email"] = user_info["email"]
-                    st.session_state["logged_in"] = True
-                    st.session_state["id_token"] = user_info["idToken"]
-
-                    get_user_data_from_firestore(st.session_state["user"], st.session_state["id_token"])
-                    
-                    st.success(f"アカウント '{user_info['email']}' を作成しました。そのままログインしました。")
-                    st.rerun()
+                    st.success(f"アカウント '{user_info['email']}' を作成しました。ログインしてください。")
                 except requests.exceptions.HTTPError as e:
                     error_json = e.response.json()
                     error_code = error_json.get("error", {}).get("message", "Unknown error")
@@ -271,7 +192,7 @@ def login_page():
 def logout():
     """ユーザーをログアウトさせる関数"""
     if st.session_state.get("logged_in"):
-        keys_to_clear = ["user", "email", "logged_in", "id_token", "plan", "remaining_uses",
+        keys_to_clear = ["user", "email", "logged_in", "plan", "remaining_uses",
                          "score_a", "comment_a", "yakujihou_a", "score_b", "comment_b", "yakujihou_b",
                          "ai_response_a", "ai_response_b"]
         for key in keys_to_clear:
@@ -292,12 +213,7 @@ def check_login():
         st.sidebar.write(f"ようこそ, {st.session_state.get('email')}!")
         
         if "remaining_uses" not in st.session_state or st.session_state.remaining_uses is None:
-            if st.session_state.id_token:
-                get_user_data_from_firestore_rest(st.session_state["user"], st.session_state.id_token)
-            else:
-                st.sidebar.warning("IDトークンがありません。ログインし直してください。")
-                logout()
-                return
+            get_user_data_from_firestore(st.session_state["user"])
         
         st.sidebar.write(f"残り回数: {st.session_state.remaining_uses}回 ({st.session_state.plan}プラン)")
         st.sidebar.button("ログアウト", on_click=logout)
