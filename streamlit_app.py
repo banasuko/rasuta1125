@@ -100,7 +100,7 @@ st.markdown(
         border: 1px solid #E0E0E0;
         border-radius: 8px;
         background-color: #FFFFFF;
-        box-shadow: 0px 2px 5px rgba(0,0,0,0.05);
+        box-shadow: 0px 2px 5px rgba(0,0,0,0.05); /* Soft shadow */
     }
     .stExpander > div > div { /* Header part */
         background-color: #F8F8F8; /* Match secondaryBackgroundColor */
@@ -222,7 +222,7 @@ col1, col2 = st.columns([2, 1])
 
 with col1:
     with st.container(border=True):
-        st.subheader("📝 バナー情報入力フォーム")
+        st.subheader("� バナー情報入力フォーム")
 
         with st.expander("👤 基本情報", expanded=True):
             user_name = st.text_input("ユーザー名", key="user_name_input")
@@ -426,6 +426,7 @@ with col1:
                         st.info("利用回数を増やすには、プランのアップグレードが必要です。")
                     else:
                         # Decrement uses in Firestore via auth_utils
+                        # Call update_user_uses_in_firestore_rest
                         if auth_utils.update_user_uses_in_firestore_rest(st.session_state["user"], st.session_state["id_token"]): 
                             image_b_bytes = io.BytesIO() # Create BytesIO object for image
                             Image.open(uploaded_file_b).save(image_b_bytes, format="PNG") # Save uploaded image to BytesIO
