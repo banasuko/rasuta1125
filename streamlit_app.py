@@ -12,7 +12,7 @@ import auth_utils # Import auth_utils.py
 
 
 # Google Apps Script (GAS) and Google Drive information (GAS for legacy spreadsheet, will be removed later if not needed)
-GAS_URL = "https://script.google.com/macros/s/AKfycby_uD6Jtb9GT0-atbyPKOPc8uyVKodwYVIQ2Tpe-_E8uTOPiir0Ce1NAPZDEOlCUxN4/exec" # Update this URL to your latest GAS deployment URL
+GAS_URL = "https://script.google.com/macros/s/AKfycby_uD6Jtb9GT0-atbyPKOPc8uyVKodwYVIQ2Tpe-_E8uTOPiir0Ce1NAPZDEOlCUxN4/exec" # このURLを更新してください
 
 
 # Helper function to sanitize values
@@ -91,7 +91,7 @@ st.markdown(
         box-shadow: 0px 6px 15px rgba(0, 0, 255, 0.3);
     }
     .stButton > button:active {
-        background-color: #0000CC; /* Darker blue on click */
+        background-color: #0000CC;
         box-shadow: none;
     }
 
@@ -212,9 +212,9 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-# --- End of Custom CSS ---
+# --- カスタムCSSの終わり ---
 
-# --- Application Body (Only executes if user is logged in) ---
+# --- アプリケーション本体（ログイン済みの場合のみ実行） ---
 st.title("🧠 バナー広告 採点AI - バナスコ")
 st.subheader("〜もう、無駄打ちしない。広告を“武器”に変えるAIツール〜")
 
@@ -398,7 +398,7 @@ with col1:
                                     max_tokens=500,
                                     temperature=0.3,
                                 )
-                                st.session_state.yakujihou_a = yakujihou_response_a.choices[0].message.content.strip() if yakujihou_response_a.choices else "薬機法チェックの結果を取得できませんでした。" 
+                                st.session_state.yakujihou_a = yakujihou_response_a.choices[0].message.content.strip() if yakijihou_response_a.choices else "薬機法チェックの結果を取得できませんでした。" 
                                 
                                 if "OK" in st.session_state.yakujihou_a: 
                                     st.success(f"薬機法チェック：{st.session_state.yakujihou_a}") 
