@@ -12,7 +12,7 @@ import auth_utils # Import auth_utils.py
 
 
 # Google Apps Script (GAS) and Google Drive information (GAS for legacy spreadsheet, will be removed later if not needed)
-GAS_URL = "https://script.google.com/macros/s/AKfycby_uD6Jtb9GT0-atbyPKOPc8uyVKodwYVIQ2Tpe-_E8uTOPiir0Ce1NAPZDEOlCUxN4/exec" # このURLを更新してください
+GAS_URL = "https://script.google.com/macros/s/AKfycby_uD6Jtb9GT0-atbyPKOPc8uyVKodwYVIQ2Tpe-_E8uTOPiir0Ce1NAPZDEOlCUxN4/exec" # Update this URL to your latest GAS deployment URL
 
 
 # Helper function to sanitize values
@@ -212,9 +212,9 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-# --- カスタムCSSの終わり ---
+# --- End of Custom CSS ---
 
-# --- アプリケーション本体（ログイン済みの場合のみ実行） ---
+# --- Application Body (Only executes if user is logged in) ---
 st.title("🧠 バナー広告 採点AI - バナスコ")
 st.subheader("〜もう、無駄打ちしない。広告を“武器”に変えるAIツール〜")
 
@@ -222,7 +222,7 @@ col1, col2 = st.columns([2, 1])
 
 with col1:
     with st.container(border=True):
-        st.subheader("� バナー情報入力フォーム")
+        st.subheader("📝 バナー情報入力フォーム")
 
         with st.expander("👤 基本情報", expanded=True):
             user_name = st.text_input("ユーザー名", key="user_name_input")
