@@ -440,8 +440,8 @@ with col1:
 
                             if image_url_b: # Proceed if image upload was successful
                                 with st.spinner("AIがBパターンを採点中です..."):
-                                    try:
-                                        ai_prompt_text = f"""
+    try:
+        ai_prompt_text = f"""
 以下のバナー画像をプロ視点で採点してください。
 この広告のターゲット年代は「{age_group}」で、主な目的は「{purpose}」です。
 
@@ -459,54 +459,59 @@ with col1:
 スコア：{score_format}
 改善コメント：2～3行でお願いします
 ---"""
-                                    response_b = client.chat.completions.create(
-                                        model="gpt-4o",
-                                        messages=[
-                                            {"role": "system", "content": "あなたは広告のプロです。"},
-                                            {"role": "user", "content": [
-                                                {"type": "text", "text": ai_prompt_text},
-                                                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str_b}"}}
-                                            ]}
-                                        ],
-                                        max_tokens=600
-                                    )
-                                    content_b = response_b.choices[0].message.content
-                                    st.session_state.ai_response_b = content_b
 
-                                    score_match_b = re.search(r"スコア[:：]\s*(.+)", content_b)
-                                    comment_match_b = re.search(r"改善コメント[:：]\s*(.+)", content_b)
-                                    st.session_state.score_b = score_match_b.group(1).strip() if score_match_b else "取得できず"
-                                    st.session_state.comment_b = comment_match_b.group(1).strip() if comment_match_b else "取得できず"
+        # 🔧 img_str_b の追加
+        img_str_b = base64.b64encode(image_b_bytes.getvalue()).decode()
 
-                                    # Prepare data for Firestore
-                                    firestore_record_data = {
-                                        "timestamp": datetime.now().isoformat() + "Z", # ISO 8601 format for Firestore timestamp
-                                        "platform": sanitize(platform),
-                                        "category": sanitize(category),
-                                        "industry": sanitize(industry),
-                                        "age_group": sanitize(age_group),
-                                        "purpose": sanitize(purpose),
-                                        "score": sanitize(st.session_state.score_b),
-                                        "comment": sanitize(st.session_state.comment_b),
-                                        "result": sanitize(result_input), # User-entered arbitrary AI eval result
-                                        "follower_gain": sanitize(follower_gain_input),
-                                        "memo": sanitize(memo_input),
-                                        "image_url": image_url_b # Add image URL to Firestore data
-                                    }
-                                    # Send data to Firestore
-                                    if auth_utils.add_diagnosis_record_to_firestore(
-                                        st.session_state["user"], 
-                                        st.session_state["id_token"], 
-                                        firestore_record_data
-                                    ):
-                                        st.success("📊 診断結果をFirestoreに記録しました！")
-                                    else:
-                                        st.error("❌ 診断結果のFirestore記録に失敗しました。")
+        response_b = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "あなたは広告のプロです。"},
+                {"role": "user", "content": [
+                    {"type": "text", "text": ai_prompt_text},
+                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str_b}"}}
+                ]}
+            ],
+            max_tokens=600
+        )
 
-                                except Exception as e:
-                                    st.error(f"AI採点中にエラーが発生しました（Bパターン）: {str(e)}")
-                                    st.session_state.score_b = "エラー"
-                                    st.session_state.comment_b = "AI応答エラー"
+        content_b = response_b.choices[0].message.content
+        st.session_state.ai_response_b = content_b
+
+        score_match_b = re.search(r"スコア[:：]\s*(.+)", content_b)
+        comment_match_b = re.search(r"改善コメント[:：]\s*(.+)", content_b)
+        st.session_state.score_b = score_match_b.group(1).strip() if score_match_b else "取得できず"
+        st.session_state.comment_b = comment_match_b.group(1).strip() if comment_match_b else "取得できず"
+
+        # Firestore登録処理（省略せずそのまま）
+        firestore_record_data = {
+            "timestamp": datetime.now().isoformat() + "Z",
+            "platform": sanitize(platform),
+            "category": sanitize(category),
+            "industry": sanitize(industry),
+            "age_group": sanitize(age_group),
+            "purpose": sanitize(purpose),
+            "score": sanitize(st.session_state.score_b),
+            "comment": sanitize(st.session_state.comment_b),
+            "result": sanitize(result_input),
+            "follower_gain": sanitize(follower_gain_input),
+            "memo": sanitize(memo_input),
+            "image_url": image_url_b
+        }
+        if auth_utils.add_diagnosis_record_to_firestore(
+            st.session_state["user"], 
+            st.session_state["id_token"], 
+            firestore_record_data
+        ):
+            st.success("📊 診断結果をFirestoreに記録しました！")
+        else:
+            st.error("❌ 診断結果のFirestore記録に失敗しました。")
+
+    except Exception as e:
+        st.error(f"AI採点中にエラーが発生しました（Bパターン）: {str(e)}")
+        st.session_state.score_b = "エラー"
+        st.session_state.comment_b = "AI応答エラー"
+
                         else:
                             st.error("利用回数の更新に失敗しました。") # Error message if Firestore update fails
                     st.success("Bパターンの診断が完了しました！")
