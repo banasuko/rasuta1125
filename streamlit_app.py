@@ -12,7 +12,8 @@ import auth_utils # Import auth_utils.py
 
 
 # Google Apps Script (GAS) and Google Drive information (GAS for legacy spreadsheet, will be removed later if not needed)
-GAS_URL = "https://script.google.com/macros/s/AKfycbzGn9la5Xma_VDH3Ep4CiqhLSqgtPwwgmVf1QQ6IGwHJpuE0MqkcLzESrOb5LYDbmhs/exec" # このURLを更新してください
+# GASへの送信はFirestore移行後は不要になりますが、念のためURLは残します。
+GAS_URL = "https://script.google.com/macros/s/AKfycby_uD6Jtb9GT0-atbyPKOPc8uyVKodwYVIQ2Tpe-_E8uTOPiir0Ce1NAPZDEOlCUxN4/exec" # This URL is still here for spreadsheet backup for now
 
 
 # Helper function to sanitize values
@@ -97,9 +98,9 @@ st.markdown(
 
     /* Expander styling */
     .stExpander {
-        border: 1px solid #E0E0E0;
+        border: 1px solid #E0E0E0; /* Light gray border */
         border-radius: 8px;
-        background-color: #FFFFFF;
+        background-color: #FFFFFF; /* White background */
         box-shadow: 0px 2px 5px rgba(0,0,0,0.05); /* Soft shadow */
     }
     .stExpander > div > div { /* Header part */
@@ -109,7 +110,7 @@ st.markdown(
         border-top-right-radius: 8px;
     }
     .stExpanderDetails { /* Expanded content part */
-        background-color: #FFFFFF;
+        background-color: #FFFFFF; /* Same as expander body */
     }
 
     /* Text input, selectbox, textarea styling */
@@ -120,8 +121,8 @@ st.markdown(
     .stTextInput .st-eb, /* Text input display */
     .stTextArea .st-eb /* Textarea display */
     {
-        background-color: #FFFFFF !important;
-        color: #333333 !important;
+        background-color: #FFFFFF !important; /* White background */
+        color: #333333 !important; /* Dark text */
         border-radius: 8px;
         border: 1px solid #E0E0E0;
         box-shadow: inset 0px 1px 3px rgba(0,0,0,0.05); /* Subtle inner shadow */
@@ -137,21 +138,21 @@ st.markdown(
         box-shadow: 0 0 0 2px rgba(0, 0, 255, 0.3);
     }
 
-    /* メトリック */
+    /* Metric (st.metric) styling */
     [data-testid="stMetricValue"] {
-        color: #FFD700; /* 鮮やかな黄色 (Newpeaceの黄色をイメージ) */
+        color: #FFD700; /* Vibrant yellow (Newpeace-inspired) */
         font-size: 2.5rem;
         font-weight: bold;
     }
     [data-testid="stMetricLabel"] {
-        color: #666666;
+        color: #666666; /* Slightly darker label color */
         font-size: 0.9rem;
     }
     [data-testid="stMetricDelta"] {
-        color: #333333;
+        color: #333333; /* Delta text color */
     }
 
-    /* Info, Success, Warning, Error boxes */
+    /* Alert boxes (Info, Success, Warning, Error) */
     .stAlert {
         color: #333333;
     }
@@ -172,7 +173,7 @@ st.markdown(
         border-left-color: #FF0000;
     }
 
-    /* コードブロック */
+    /* Code block styling */
     code {
         background-color: #F0F0F0 !important;
         color: #000080 !important;
@@ -185,36 +186,34 @@ st.markdown(
         overflow-x: auto;
     }
 
-    /* サイドバーのテキスト色を調整 */
+    /* Sidebar text color adjustment */
     .stSidebar [data-testid="stText"],
     .stSidebar [data-testid="stMarkdownContainer"],
     .stSidebar .st-emotion-cache-1jm692h {
         color: #333333;
     }
 
-    /* セレクトボックスのドロップダウンリストの背景色 */
+    /* Selectbox dropdown list background and item colors */
     div[data-baseweb="popover"] > div {
         background-color: #FFFFFF !important;
         color: #333333 !important;
     }
-    /* セレクトボックスのドロップダウンリストのアイテムのテキスト色 */
+    /* Selectbox dropdown list item text color */
     div[data-baseweb="popover"] > div > ul > li {
         color: #333333 !important;
     }
-    /* セレクトボックスのドロップダウンリストのホバー色 */
+    /* Selectbox dropdown list item hover color */
     div[data-baseweb="popover"] > div > ul > li[data-mouse-entered="true"] {
-        background-color: #E0EFFF !important; /* 薄い青 */
-        color: #0000FF !important; /* アクセントの青 */
+        background-color: #E0EFFF !important; /* Light blue */
+        color: #0000FF !important; /* Accent blue */
     }
-
-
     </style>
     """,
     unsafe_allow_html=True
 )
-# --- カスタムCSSの終わり ---
+# --- End of Custom CSS ---
 
-# --- アプリケーション本体（ログイン済みの場合のみ実行） ---
+# --- Application Body (Only executes if user is logged in) ---
 st.title("🧠 バナー広告 採点AI - バナスコ")
 st.subheader("〜もう、無駄打ちしない。広告を“武器”に変えるAIツール〜")
 
@@ -274,11 +273,13 @@ with col1:
             with img_col_a:
                 st.image(Image.open(uploaded_file_a), caption="Aパターン画像", use_container_width=True)
                 if st.button("🚀 Aパターンを採点", key="score_a_btn"):
+                    # Check remaining uses
                     if st.session_state.remaining_uses <= 0:
                         st.warning(f"残り回数がありません。（{st.session_state.plan}プラン）")
                         st.info("利用回数を増やすには、プランのアップグレードが必要です。")
                     else:
                         # Decrement uses in Firestore via auth_utils
+                        # Call update_user_uses_in_firestore_rest
                         if auth_utils.update_user_uses_in_firestore_rest(st.session_state["user"], st.session_state["id_token"]): 
                             image_a_bytes = io.BytesIO() # Create BytesIO object for image
                             Image.open(uploaded_file_a).save(image_a_bytes, format="PNG") # Save uploaded image to BytesIO
@@ -358,7 +359,6 @@ with col1:
                                         else:
                                             st.error("❌ 診断結果のFirestore記録に失敗しました。")
 
-
                                     except Exception as e:
                                         st.error(f"AI採点中にエラーが発生しました（Aパターン）: {str(e)}")
                                         st.session_state.score_a = "エラー"
@@ -426,6 +426,7 @@ with col1:
                         st.info("利用回数を増やすには、プランのアップグレードが必要です。")
                     else:
                         # Decrement uses in Firestore via auth_utils
+                        # Call update_user_uses_in_firestore_rest
                         if auth_utils.update_user_uses_in_firestore_rest(st.session_state["user"], st.session_state["id_token"]): 
                             image_b_bytes = io.BytesIO() # Create BytesIO object for image
                             Image.open(uploaded_file_b).save(image_b_bytes, format="PNG") # Save uploaded image to BytesIO
@@ -459,49 +460,51 @@ with col1:
 スコア：{score_format}
 改善コメント：2～3行でお願いします
 ---"""
-                                    response_b = client.chat.completions.create(
-                                        model="gpt-4o",
-                                        messages=[
-                                            {"role": "system", "content": "あなたは広告のプロです。"},
-                                            {"role": "user", "content": [
-                                                {"type": "text", "text": ai_prompt_text},
-                                                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str_b}"}}
-                                            ]}
-                                        ],
-                                        max_tokens=600
-                                    )
-                                    content_b = response_b.choices[0].message.content
-                                    st.session_state.ai_response_b = content_b
+                                        # Use base64 string for OpenAI Vision API
+                                        img_str_b = base64.b64encode(image_b_bytes.getvalue()).decode()
+                                        response_b = client.chat.completions.create(
+                                            model="gpt-4o",
+                                            messages=[
+                                                {"role": "system", "content": "あなたは広告のプロです。"},
+                                                {"role": "user", "content": [
+                                                    {"type": "text", "text": ai_prompt_text},
+                                                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str_b}"}}
+                                                ]}
+                                            ],
+                                            max_tokens=600
+                                        )
+                                        content_b = response_b.choices[0].message.content
+                                        st.session_state.ai_response_b = content_b
 
-                                    score_match_b = re.search(r"スコア[:：]\s*(.+)", content_b)
-                                    comment_match_b = re.search(r"改善コメント[:：]\s*(.+)", content_b)
-                                    st.session_state.score_b = score_match_b.group(1).strip() if score_match_b else "取得できず"
-                                    st.session_state.comment_b = comment_match_b.group(1).strip() if comment_match_b else "取得できず"
+                                        score_match_b = re.search(r"スコア[:：]\s*(.+)", content_b)
+                                        comment_match_b = re.search(r"改善コメント[:：]\s*(.+)", content_b)
+                                        st.session_state.score_b = score_match_b.group(1).strip() if score_match_b else "取得できず"
+                                        st.session_state.comment_b = comment_match_b.group(1).strip() if comment_match_b else "取得できず"
 
-                                    # Prepare data for Firestore
-                                    firestore_record_data = {
-                                        "timestamp": datetime.now().isoformat() + "Z", # ISO 8601 format for Firestore timestamp
-                                        "platform": sanitize(platform),
-                                        "category": sanitize(category),
-                                        "industry": sanitize(industry),
-                                        "age_group": sanitize(age_group),
-                                        "purpose": sanitize(purpose),
-                                        "score": sanitize(st.session_state.score_b),
-                                        "comment": sanitize(st.session_state.comment_b),
-                                        "result": sanitize(result_input), # User-entered arbitrary AI eval result
-                                        "follower_gain": sanitize(follower_gain_input),
-                                        "memo": sanitize(memo_input),
-                                        "image_url": image_url_b # Add image URL to Firestore data
-                                    }
-                                    # Send data to Firestore
-                                    if auth_utils.add_diagnosis_record_to_firestore(
-                                        st.session_state["user"], 
-                                        st.session_state["id_token"], 
-                                        firestore_record_data
-                                    ):
-                                        st.success("📊 診断結果をFirestoreに記録しました！")
-                                    else:
-                                        st.error("❌ 診断結果のFirestore記録に失敗しました。")
+                                        # Prepare data for Firestore
+                                        firestore_record_data = {
+                                            "timestamp": datetime.now().isoformat() + "Z", # ISO 8601 format for Firestore timestamp
+                                            "platform": sanitize(platform),
+                                            "category": sanitize(category),
+                                            "industry": sanitize(industry),
+                                            "age_group": sanitize(age_group),
+                                            "purpose": sanitize(purpose),
+                                            "score": sanitize(st.session_state.score_b),
+                                            "comment": sanitize(st.session_state.comment_b),
+                                            "result": sanitize(result_input), # User-entered arbitrary AI eval result
+                                            "follower_gain": sanitize(follower_gain_input),
+                                            "memo": sanitize(memo_input),
+                                            "image_url": image_url_b # Add image URL to Firestore data
+                                        }
+                                        # Send data to Firestore
+                                        if auth_utils.add_diagnosis_record_to_firestore(
+                                            st.session_state["user"], 
+                                            st.session_state["id_token"], 
+                                            firestore_record_data
+                                        ):
+                                            st.success("📊 診断結果をFirestoreに記録しました！")
+                                        else:
+                                            st.error("❌ 診断結果のFirestore記録に失敗しました。")
 
                                 except Exception as e:
                                     st.error(f"AI採点中にエラーが発生しました（Bパターン）: {str(e)}")
@@ -540,7 +543,7 @@ with col1:
                                     max_tokens=500,
                                     temperature=0.3,
                                 )
-                                st.session_state.yakujihou_b = yakujihou_response_b.choices[0].message.content.strip() if yakujihou_response_b.choices else "薬機法チェックの結果を取得できませんでした。" 
+                                st.session_state.yakujihou_b = yakijihou_response_b.choices[0].message.content.strip() if yakijihou_response_b.choices else "薬機法チェックの結果を取得できませんでした。" 
                                 
                                 if "OK" in st.session_state.yakujihou_b: 
                                     st.success(f"薬機法チェック：{st.session_state.yakujihou_b}") 
