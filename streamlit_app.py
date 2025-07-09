@@ -278,7 +278,7 @@ with col1:
                         st.warning(f"残り回数がありません。（{st.session_state.plan}プラン）")
                         st.info("利用回数を増やすには、プランのアップグレードが必要です。")
                     else:
-                        # ✅ 利用回数消費の呼び出しを auth_utils.update_user_uses_in_firestore_rest に変更
+                        # Decrement uses in Firestore via auth_utils
                         if auth_utils.update_user_uses_in_firestore_rest(st.session_state["user"], st.session_state["id_token"]): 
                             image_a_bytes = io.BytesIO() # Create BytesIO object for image
                             Image.open(uploaded_file_a).save(image_a_bytes, format="PNG") # Save uploaded image to BytesIO
