@@ -12,7 +12,7 @@ import auth_utils # Import auth_utils.py
 
 
 # Google Apps Script (GAS) and Google Drive information (GAS for legacy spreadsheet, will be removed later if not needed)
-GAS_URL = "https://script.google.com/macros/s/AKfycby_uD6Jtb9GT0-atbyPKOPc8uyVKodwYVIQ2Tpe-_E8uTOPiir0Ce1NAPZDEOlCUxN4/exec" # このURLを更新してください
+GAS_URL = "https://script.google.com/macros/s/AKfycbzGn9la5Xma_VDH3Ep4CiqhLSqgtPwwgmVf1QQ6IGwHJpuE0MqkcLzESrOb5LYDbmhs/exec" # このURLを更新してください
 
 
 # Helper function to sanitize values
@@ -222,7 +222,7 @@ col1, col2 = st.columns([2, 1])
 
 with col1:
     with st.container(border=True):
-        st.subheader("� バナー情報入力フォーム")
+        st.subheader("📝 バナー情報入力フォーム")
 
         with st.expander("👤 基本情報", expanded=True):
             user_name = st.text_input("ユーザー名", key="user_name_input")
@@ -426,7 +426,6 @@ with col1:
                         st.info("利用回数を増やすには、プランのアップグレードが必要です。")
                     else:
                         # Decrement uses in Firestore via auth_utils
-                        # Call update_user_uses_in_firestore_rest
                         if auth_utils.update_user_uses_in_firestore_rest(st.session_state["user"], st.session_state["id_token"]): 
                             image_b_bytes = io.BytesIO() # Create BytesIO object for image
                             Image.open(uploaded_file_b).save(image_b_bytes, format="PNG") # Save uploaded image to BytesIO
