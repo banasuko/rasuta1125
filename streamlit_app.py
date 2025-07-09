@@ -100,7 +100,7 @@ st.markdown(
         border: 1px solid #E0E0E0;
         border-radius: 8px;
         background-color: #FFFFFF;
-        box-shadow: 0px 2px 5px rgba(0,0,0,0.05);
+        box-shadow: 0px 2px 5px rgba(0,0,0,0.05); /* Soft shadow */
     }
     .stExpander > div > div { /* Header part */
         background-color: #F8F8F8; /* Match secondaryBackgroundColor */
@@ -222,7 +222,7 @@ col1, col2 = st.columns([2, 1])
 
 with col1:
     with st.container(border=True):
-        st.subheader("📝 バナー情報入力フォーム")
+        st.subheader("� バナー情報入力フォーム")
 
         with st.expander("👤 基本情報", expanded=True):
             user_name = st.text_input("ユーザー名", key="user_name_input")
@@ -278,7 +278,7 @@ with col1:
                         st.warning(f"残り回数がありません。（{st.session_state.plan}プラン）")
                         st.info("利用回数を増やすには、プランのアップグレードが必要です。")
                     else:
-                        # ✅ 利用回数消費の呼び出しを auth_utils.update_user_uses_in_firestore_rest に変更
+                        # Decrement uses in Firestore via auth_utils
                         if auth_utils.update_user_uses_in_firestore_rest(st.session_state["user"], st.session_state["id_token"]): 
                             image_a_bytes = io.BytesIO() # Create BytesIO object for image
                             Image.open(uploaded_file_a).save(image_a_bytes, format="PNG") # Save uploaded image to BytesIO
@@ -363,10 +363,10 @@ with col1:
                                         st.error(f"AI採点中にエラーが発生しました（Aパターン）: {str(e)}")
                                         st.session_state.score_a = "エラー"
                                         st.session_state.comment_a = "AI応答エラー"
-                            else:
+                            else: # If image upload failed
                                 st.error("画像アップロードに失敗したため、採点を行いませんでした。")
-                        else:
-                            st.error("利用回数の更新に失敗しました。") # Error message if Firestore update fails
+                        else: # If Firestore uses update failed
+                            st.error("利用回数の更新に失敗しました。")
                     st.success("Aパターンの診断が完了しました！")
             
             with result_col_a:
@@ -426,7 +426,6 @@ with col1:
                         st.info("利用回数を増やすには、プランのアップグレードが必要です。")
                     else:
                         # Decrement uses in Firestore via auth_utils
-                        # Call update_user_uses_in_firestore_rest
                         if auth_utils.update_user_uses_in_firestore_rest(st.session_state["user"], st.session_state["id_token"]): 
                             image_b_bytes = io.BytesIO() # Create BytesIO object for image
                             Image.open(uploaded_file_b).save(image_b_bytes, format="PNG") # Save uploaded image to BytesIO
