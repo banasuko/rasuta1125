@@ -124,7 +124,7 @@ st.markdown(
         color: #333333 !important;
         border-radius: 8px;
         border: 1px solid #E0E0E0;
-        box-shadow: inset 0px 1px 3px rgba(0,0,0,0.05);
+        box-shadow: inset 0px 1px 3px rgba(0,0,0,0.05); /* Subtle inner shadow */
     }
     /* Focus styling for input elements */
     div[data-baseweb="input"] input:focus,
@@ -359,10 +359,10 @@ with col1:
                                             st.error("❌ 診断結果のFirestore記録に失敗しました。")
 
 
-                                except Exception as e:
-                                    st.error(f"AI採点中にエラーが発生しました（Aパターン）: {str(e)}")
-                                    st.session_state.score_a = "エラー"
-                                    st.session_state.comment_a = "AI応答エラー"
+                                    except Exception as e:
+                                        st.error(f"AI採点中にエラーが発生しました（Aパターン）: {str(e)}")
+                                        st.session_state.score_a = "エラー"
+                                        st.session_state.comment_a = "AI応答エラー"
                             else:
                                 st.error("画像アップロードに失敗したため、採点を行いませんでした。")
                         else:
