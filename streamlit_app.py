@@ -91,7 +91,7 @@ st.markdown(
         box-shadow: 0px 6px 15px rgba(0, 0, 255, 0.3);
     }
     .stButton > button:active {
-        background-color: #0000CC;
+        background-color: #0000CC; /* Darker blue on click */
         box-shadow: none;
     }
 
@@ -222,7 +222,7 @@ col1, col2 = st.columns([2, 1])
 
 with col1:
     with st.container(border=True):
-        st.subheader("📝 バナー情報入力フォーム")
+        st.subheader("� バナー情報入力フォーム")
 
         with st.expander("👤 基本情報", expanded=True):
             user_name = st.text_input("ユーザー名", key="user_name_input")
@@ -398,7 +398,7 @@ with col1:
                                     max_tokens=500,
                                     temperature=0.3,
                                 )
-                                st.session_state.yakujihou_a = yakujihou_response_a.choices[0].message.content.strip() if yakijihou_response_a.choices else "薬機法チェックの結果を取得できませんでした。" 
+                                st.session_state.yakujihou_a = yakujihou_response_a.choices[0].message.content.strip() if yakujihou_response_a.choices else "薬機法チェックの結果を取得できませんでした。" 
                                 
                                 if "OK" in st.session_state.yakujihou_a: 
                                     st.success(f"薬機法チェック：{st.session_state.yakujihou_a}") 
