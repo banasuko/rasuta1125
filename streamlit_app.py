@@ -91,7 +91,7 @@ st.markdown(
         box-shadow: 0px 6px 15px rgba(0, 0, 255, 0.3);
     }
     .stButton > button:active {
-        background-color: #0000CC;
+        background-color: #0000CC; /* Darker blue on click */
         box-shadow: none;
     }
 
@@ -222,7 +222,7 @@ col1, col2 = st.columns([2, 1])
 
 with col1:
     with st.container(border=True):
-        st.subheader("📝 バナー情報入力フォーム")
+        st.subheader("� バナー情報入力フォーム")
 
         with st.expander("👤 基本情報", expanded=True):
             user_name = st.text_input("ユーザー名", key="user_name_input")
@@ -398,7 +398,7 @@ with col1:
                                     max_tokens=500,
                                     temperature=0.3,
                                 )
-                                st.session_state.yakujihou_a = yakujihou_response_a.choices[0].message.content.strip() if yakijihou_response_a.choices else "薬機法チェックの結果を取得できませんでした。" 
+                                st.session_state.yakujihou_a = yakujihou_response_a.choices[0].message.content.strip() if yakujihou_response_a.choices else "薬機法チェックの結果を取得できませんでした。" 
                                 
                                 if "OK" in st.session_state.yakujihou_a: 
                                     st.success(f"薬機法チェック：{st.session_state.yakujihou_a}") 
@@ -410,38 +410,35 @@ with col1:
 
         st.markdown("---")
 
-        # --- B Pattern Processing ---
-        if uploaded_file_b:
-            img_col_b, result_col_b = st.columns([1, 2])
+# --- B Pattern Processing ---
+if uploaded_file_b:
+    img_col_b, result_col_b = st.columns([1, 2])
 
-            with img_col_b:
-                st.image(Image.open(uploaded_file_b), caption="Bパターン画像", use_container_width=True)
-                if st.button("🚀 Bパターンを採点", key="score_b_btn"):
-                    # Add plan-based restriction for B-pattern here
-                    if st.session_state.plan == "Free": # Check if user is on Free plan
-                        st.warning("この機能はFreeプランではご利用いただけません。")
-                        st.info("Bパターン診断はLightプラン以上でご利用可能です。プランのアップグレードをご検討ください。")
-                    elif st.session_state.remaining_uses <= 0:
-                        st.warning(f"残り回数がありません。（{st.session_state.plan}プラン）")
-                        st.info("利用回数を増やすには、プランのアップグレードが必要です。")
-                    else:
-                        # Decrement uses in Firestore via auth_utils
-                        if auth_utils.update_user_uses_in_firestore_rest(st.session_state["user"], st.session_state["id_token"]): 
-                            image_b_bytes = io.BytesIO() # Create BytesIO object for image
-                            Image.open(uploaded_file_b).save(image_b_bytes, format="PNG") # Save uploaded image to BytesIO
-                            image_filename_b = f"banner_B_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
-                            
-                            # Upload image to Firebase Storage
-                            image_url_b = auth_utils.upload_image_to_firebase_storage(
-                                st.session_state["user"], 
-                                image_b_bytes, 
-                                image_filename_b
-                            )
+    with img_col_b:
+        st.image(Image.open(uploaded_file_b), caption="Bパターン画像", use_container_width=True)
+        if st.button("🚀 Bパターンを採点", key="score_b_btn"):
+            if st.session_state.plan == "Free":
+                st.warning("この機能はFreeプランではご利用いただけません。")
+                st.info("Bパターン診断はLightプラン以上でご利用可能です。プランのアップグレードをご検討ください。")
+            elif st.session_state.remaining_uses <= 0:
+                st.warning(f"残り回数がありません。（{st.session_state.plan}プラン）")
+                st.info("利用回数を増やすには、プランのアップグレードが必要です。")
+            else:
+                if auth_utils.update_user_uses_in_firestore_rest(st.session_state["user"], st.session_state["id_token"]): 
+                    image_b_bytes = io.BytesIO()
+                    Image.open(uploaded_file_b).save(image_b_bytes, format="PNG")
+                    image_filename_b = f"banner_B_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
+                    
+                    image_url_b = auth_utils.upload_image_to_firebase_storage(
+                        st.session_state["user"], 
+                        image_b_bytes, 
+                        image_filename_b
+                    )
 
-                            if image_url_b: # Proceed if image upload was successful
-                                with st.spinner("AIがBパターンを採点中です..."):
-                                    try:
-                                        ai_prompt_text = f"""
+                    if image_url_b:
+                        with st.spinner("AIがBパターンを採点中です..."):
+                            try:
+                                ai_prompt_text = f"""
 以下のバナー画像をプロ視点で採点してください。
 この広告のターゲット年代は「{age_group}」で、主な目的は「{purpose}」です。
 
@@ -459,56 +456,63 @@ with col1:
 スコア：{score_format}
 改善コメント：2～3行でお願いします
 ---"""
-                                    response_b = client.chat.completions.create(model="gpt-4o",
-                                        messages=[
-                                            {"role": "system", "content": "あなたは広告のプロです。"},
-                                            {"role": "user", "content": [
-                                                {"type": "text", "text": ai_prompt_text},
-                                                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str_b}"}}
-                                            ]}
-                                        ],
-                                        max_tokens=600
-                                    )
-                                    content_b = response_b.choices[0].message.content
-                                    st.session_state.ai_response_b = content_b
 
-                                    score_match_b = re.search(r"スコア[:：]\s*(.+)", content_b)
-                                    comment_match_b = re.search(r"改善コメント[:：]\s*(.+)", content_b)
-                                    st.session_state.score_b = score_match_b.group(1).strip() if score_match_b else "取得できず"
-                                    st.session_state.comment_b = comment_match_b.group(1).strip() if comment_match_b else "取得できず"
+                                img_str_b = base64.b64encode(image_b_bytes.getvalue()).decode()
 
-                                    # Prepare data for Firestore
-                                    firestore_record_data = {
-                                        "timestamp": datetime.now().isoformat() + "Z", # ISO 8601 format for Firestore timestamp
-                                        "platform": sanitize(platform),
-                                        "category": sanitize(category),
-                                        "industry": sanitize(industry),
-                                        "age_group": sanitize(age_group),
-                                        "purpose": sanitize(purpose),
-                                        "score": sanitize(st.session_state.score_b),
-                                        "comment": sanitize(st.session_state.comment_b),
-                                        "result": sanitize(result_input), # User-entered arbitrary AI eval result
-                                        "follower_gain": sanitize(follower_gain_input),
-                                        "memo": sanitize(memo_input),
-                                        "image_url": image_url_b # Add image URL to Firestore data
-                                    }
-                                    # Send data to Firestore
-                                    if auth_utils.add_diagnosis_record_to_firestore(
-                                        st.session_state["user"], 
-                                        st.session_state["id_token"], 
-                                        firestore_record_data
-                                    ):
-                                        st.success("📊 診断結果をFirestoreに記録しました！")
-                                    else:
-                                        st.error("❌ 診断結果のFirestore記録に失敗しました。")
+                                response_b = client.chat.completions.create(
+                                    model="gpt-4o",
+                                    messages=[
+                                        {"role": "system", "content": "あなたは広告のプロです。"},
+                                        {"role": "user", "content": [
+                                            {"type": "text", "text": ai_prompt_text},
+                                            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str_b}"}}
+                                        ]}
+                                    ],
+                                    max_tokens=600
+                                )
 
-                                except Exception as e:
-                                    st.error(f"AI採点中にエラーが発生しました（Bパターン）: {str(e)}")
-                                    st.session_state.score_b = "エラー"
-                                    st.session_state.comment_b = "AI応答エラー"
-                        else:
-                            st.error("利用回数の更新に失敗しました。") # Error message if Firestore update fails
-                    st.success("Bパターンの診断が完了しました！")
+                                content_b = response_b.choices[0].message.content
+                                st.session_state.ai_response_b = content_b
+
+                                score_match_b = re.search(r"スコア[:：]\s*(.+)", content_b)
+                                comment_match_b = re.search(r"改善コメント[:：]\s*(.+)", content_b)
+                                st.session_state.score_b = score_match_b.group(1).strip() if score_match_b else "取得できず"
+                                st.session_state.comment_b = comment_match_b.group(1).strip() if comment_match_b else "取得できず"
+
+                                firestore_record_data = {
+                                    "timestamp": datetime.now().isoformat() + "Z",
+                                    "platform": sanitize(platform),
+                                    "category": sanitize(category),
+                                    "industry": sanitize(industry),
+                                    "age_group": sanitize(age_group),
+                                    "purpose": sanitize(purpose),
+                                    "score": sanitize(st.session_state.score_b),
+                                    "comment": sanitize(st.session_state.comment_b),
+                                    "result": sanitize(result_input),
+                                    "follower_gain": sanitize(follower_gain_input),
+                                    "memo": sanitize(memo_input),
+                                    "image_url": image_url_b
+                                }
+
+                                if auth_utils.add_diagnosis_record_to_firestore(
+                                    st.session_state["user"], 
+                                    st.session_state["id_token"], 
+                                    firestore_record_data
+                                ):
+                                    st.success("📊 診断結果をFirestoreに記録しました！")
+                                else:
+                                    st.error("❌ 診断結果のFirestore記録に失敗しました。")
+
+                            except Exception as e:
+                                st.error(f"AI採点中にエラーが発生しました（Bパターン）: {str(e)}")
+                                st.exception(e)
+                                st.session_state.score_b = "エラー"
+                                st.session_state.comment_b = "AI応答エラー"
+                    else:
+                        st.error("画像アップロードに失敗したため、採点を行いませんでした。")
+                else:
+                    st.error("利用回数の更新に失敗しました。")
+            st.success("Bパターンの診断が完了しました！")
 
             with result_col_b:
                 if st.session_state.score_b:
