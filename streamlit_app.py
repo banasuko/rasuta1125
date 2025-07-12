@@ -91,7 +91,7 @@ st.markdown(
         box-shadow: 0px 6px 15px rgba(0, 0, 255, 0.3);
     }
     .stButton > button:active {
-        background-color: #0000CC; /* Darker blue on click */
+        background-color: #0000CC;
         box-shadow: none;
     }
 
@@ -398,7 +398,7 @@ with col1:
                                     max_tokens=500,
                                     temperature=0.3,
                                 )
-                                st.session_state.yakujihou_a = yakujihou_response_a.choices[0].message.content.strip() if yakujihou_response_a.choices else "薬機法チェックの結果を取得できませんでした。" 
+                                st.session_state.yakujihou_a = yakujihou_response_a.choices[0].message.content.strip() if yakijihou_response_a.choices else "薬機法チェックの結果を取得できませんでした。" 
                                 
                                 if "OK" in st.session_state.yakujihou_a: 
                                     st.success(f"薬機法チェック：{st.session_state.yakujihou_a}") 
