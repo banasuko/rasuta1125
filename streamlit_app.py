@@ -459,8 +459,7 @@ with col1:
 スコア：{score_format}
 改善コメント：2～3行でお願いします
 ---"""
-                                    response_b = client.chat.completions.create(
-                                        model="gpt-4o",
+                                    response_b = client.chat.completions.create(model="gpt-4o",
                                         messages=[
                                             {"role": "system", "content": "あなたは広告のプロです。"},
                                             {"role": "user", "content": [
