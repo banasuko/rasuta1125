@@ -11,7 +11,7 @@ from openai import OpenAI
 import auth_utils # Import auth_utils.py
 
 
-# Google Apps Script (GAS) and Google Drive information
+# Google Apps Script (GAS) and Google Drive information (GAS for legacy spreadsheet, will be removed later if not needed)
 GAS_URL = "https://script.google.com/macros/s/AKfycby_uD6Jtb9GT0-atbyPKOPc8uyVKodwYVIQ2Tpe-_E8uTOPiir0Ce1NAPZDEOlCUxN4/exec" # このURLを更新してください
 
 
@@ -91,7 +91,7 @@ st.markdown(
         box-shadow: 0px 6px 15px rgba(0, 0, 255, 0.3);
     }
     .stButton > button:active {
-        background-color: #0000CC;
+        background-color: #0000CC; /* Darker blue on click */
         box-shadow: none;
     }
 
@@ -506,7 +506,7 @@ with col1:
                                     model="gpt-4o",
                                     messages=[
                                         {"role": "system", "content": "あなたは広告表現の専門家です。"},
-                                        {"role": "user", "content": yakujihou_prompt_b}
+                                        {"role": "user", "content": yakijihou_prompt_b}
                                     ],
                                     max_tokens=500,
                                     temperature=0.3,
