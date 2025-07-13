@@ -10,7 +10,7 @@ from datetime import datetime
 
 # .envファイルに設定すべき環境変数の例:
 # OPENAI_API_KEY="sk-proj-YOUR_OPENAI_API_KEY"
-# FIREBASE_WEB_API_KEY="AIzaSyC_YOUR_FIREBASE_WEB_API_KEY"
+# FIREBASE_WEB_API_KEY="AIzaSyAflp1vqSA21sSYihZDTpje-MB1mCALxBs"
 # FIREBASE_PROJECT_ID="your-project-id" # FirebaseプロジェクトのID
 #
 # # Firebase Admin SDK (Secretsに設定推奨)
