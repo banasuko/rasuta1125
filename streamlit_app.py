@@ -91,7 +91,7 @@ st.markdown(
         box-shadow: 0px 6px 15px rgba(0, 0, 255, 0.3);
     }
     .stButton > button:active {
-        background-color: #0000CC; /* Darker blue on click */
+        background-color: #0000CC;
         box-shadow: none;
     }
 
@@ -274,17 +274,27 @@ with col1:
             with img_col_a:
                 st.image(Image.open(uploaded_file_a), caption="Aパターン画像", use_container_width=True)
                 if st.button("🚀 Aパターンを採点", key="score_a_btn"):
-                    # 利用回数チェックと消費のロジックは削除
-                    # if st.session_state.remaining_uses <= 0: ... else: ...
-                    
-                    # GASへの記録のみを行う
-                    image_a_bytes = io.BytesIO() # Create BytesIO object for image
-                    Image.open(uploaded_file_a).save(image_a_bytes, format="PNG") # Save uploaded image to BytesIO
-                    img_str_a = base64.b64encode(image_a_bytes.getvalue()).decode() # OpenAI Vision API用
+                    if st.session_state.remaining_uses <= 0:
+                        st.warning(f"残り回数がありません。（{st.session_state.plan}プラン）")
+                        st.info("利用回数を増やすには、プランのアップグレードが必要です。")
+                    else:
+                        # Decrement uses in Firestore via auth_utils
+                        if auth_utils.update_user_uses_in_firestore_rest(st.session_state["user"], st.session_state["id_token"]): 
+                            image_a_bytes = io.BytesIO() # Create BytesIO object for image
+                            Image.open(uploaded_file_a).save(image_a_bytes, format="PNG") # Save uploaded image to BytesIO
+                            image_filename_a = f"banner_A_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
+                            
+                            # Upload image to Firebase Storage
+                            image_url_a = auth_utils.upload_image_to_firebase_storage(
+                                st.session_state["user"], 
+                                image_a_bytes, 
+                                image_filename_a
+                            )
 
-                    with st.spinner("AIがAパターンを採点中です..."):
-                        try:
-                            ai_prompt_text = f"""
+                            if image_url_a: # Proceed if image upload was successful
+                                with st.spinner("AIがAパターンを採点中です..."):
+                                    try:
+                                        ai_prompt_text = f"""
 以下のバナー画像をプロ視点で採点してください。
 この広告のターゲット年代は「{age_group}」で、主な目的は「{purpose}」です。
 
@@ -302,56 +312,61 @@ with col1:
 スコア：{score_format}
 改善コメント：2～3行でお願いします
 ---"""
-                            response_a = client.chat.completions.create(
-                                model="gpt-4o",
-                                messages=[
-                                    {"role": "system", "content": "あなたは広告のプロです。"},
-                                    {"role": "user", "content": [
-                                        {"type": "text", "text": ai_prompt_text},
-                                        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str_a}"}}
-                                    ]}
-                                ],
-                                max_tokens=600
-                            )
-                            content_a = response_a.choices[0].message.content
-                            st.session_state.ai_response_a = content_a
+                                        # Use base64 string for OpenAI Vision API
+                                        img_str_a = base64.b64encode(image_a_bytes.getvalue()).decode()
+                                        response_a = client.chat.completions.create(
+                                            model="gpt-4o",
+                                            messages=[
+                                                {"role": "system", "content": "あなたは広告のプロです。"},
+                                                {"role": "user", "content": [
+                                                    {"type": "text", "text": ai_prompt_text},
+                                                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str_a}"}}
+                                                ]}
+                                            ],
+                                            max_tokens=600
+                                        )
+                                        content_a = response_a.choices[0].message.content
+                                        st.session_state.ai_response_a = content_a
 
-                            score_match_a = re.search(r"スコア[:：]\s*(.+)", content_a)
-                            comment_match_a = re.search(r"改善コメント[:：]\s*(.+)", content_a)
-                            st.session_state.score_a = score_match_a.group(1).strip() if score_match_a else "取得できず"
-                            st.session_state.comment_a = comment_match_a.group(1).strip() if comment_match_a else "取得できず"
+                                        score_match_a = re.search(r"スコア[:：]\s*(.+)", content_a)
+                                        comment_match_a = re.search(r"改善コメント[:：]\s*(.+)", content_a)
+                                        st.session_state.score_a = score_match_a.group(1).strip() if score_match_a else "取得できず"
+                                        st.session_state.comment_a = comment_match_a.group(1).strip() if comment_match_a else "取得できず"
 
-                            # Send data to Google Apps Script (GAS)
-                            data_a = {
-                                "sheet_name": "record_log",
-                                "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                                "platform": sanitize(platform),
-                                "category": sanitize(category),
-                                "industry": sanitize(industry),
-                                "age_group": sanitize(age_group),
-                                "purpose": sanitize(purpose),
-                                "score": sanitize(st.session_state.score_a),
-                                "comment": sanitize(st.session_state.comment_a),
-                                "result": sanitize(result_input), # User-entered arbitrary AI eval result
-                                "follower_gain": sanitize(follower_gain_input),
-                                "memo": sanitize(memo_input),
-                                # "image_url": image_url_a # Firebase Storage削除のためコメントアウト
-                            }
-                            try:
-                                response_gas_a = requests.post(GAS_URL, json=data_a)
-                                if response_gas_a.status_code == 200:
-                                    pass # Success message hidden
-                                else:
-                                    st.error(f"❌ スプレッドシート送信エラー（Aパターン）: ステータスコード {response_gas_a.status_code}, 応答: {response_gas_a.text}")
-                            except requests.exceptions.RequestException as e:
-                                st.error(f"GASへのデータ送信中にネットワークエラーが発生しました（Aパターン）: {str(e)}")
-                            except Exception as e:
-                                st.error(f"GASへのデータ送信中に予期せぬエラーが発生しました（Aパターン）: {str(e)}")
+                                        # Prepare data for Firestore
+                                        firestore_record_data = {
+                                            "timestamp": datetime.now().isoformat() + "Z", # ISO 8601 format for Firestore timestamp
+                                            "platform": sanitize(platform),
+                                            "category": sanitize(category),
+                                            "industry": sanitize(industry),
+                                            "age_group": sanitize(age_group),
+                                            "purpose": sanitize(purpose),
+                                            "score": sanitize(st.session_state.score_a),
+                                            "comment": sanitize(st.session_state.comment_a),
+                                            "result": sanitize(result_input), # User-entered arbitrary AI eval result
+                                            "follower_gain": sanitize(follower_gain_input),
+                                            "memo": sanitize(memo_input),
+                                            "image_url": image_url_a # Add image URL to Firestore data
+                                        }
+                                        # Send data to Firestore
+                                        if auth_utils.add_diagnosis_record_to_firestore(
+                                            st.session_state["user"], 
+                                            st.session_state["id_token"], 
+                                            firestore_record_data
+                                        ):
+                                            st.success("📊 診断結果をFirestoreに記録しました！")
+                                        else:
+                                            st.error("❌ 診断結果のFirestore記録に失敗しました。")
 
-                        except Exception as e:
-                            st.error(f"AI採点中にエラーが発生しました（Aパターン）: {str(e)}")
-                            st.session_state.score_a = "エラー"
-                            st.session_state.comment_a = "AI応答エラー"
+
+                                    except Exception as e:
+                                        st.error(f"AI採点中にエラーが発生しました（Aパターン）: {str(e)}")
+                                        st.session_state.score_a = "エラー"
+                                        st.session_state.comment_a = "AI応答エラー"
+                            else: # If image upload failed
+                                st.error("画像アップロードに失敗したため、採点を行いませんでした。")
+                        else: # If Firestore uses update failed
+                            st.error("利用回数の更新に失敗しました。")
                     st.success("Aパターンの診断が完了しました！")
             
             with result_col_a:
@@ -363,7 +378,7 @@ with col1:
                     if industry in ["美容", "健康", "医療"]:
                         with st.spinner("⚖️ 薬機法チェックを実行中（Aパターン）..."):
                             yakujihou_prompt_a = f"""
-以下の広告文（改善コメント）が薬機法に違反していないかをチェックしてください。
+以下の広告文（改善コメント）が、薬機法に違反していないかをチェックしてください。
 ※これはバナー画像の内容に対するAIの改善コメントであり、実際の広告文ではありません。
 
 ---
@@ -402,17 +417,31 @@ with col1:
             with img_col_b:
                 st.image(Image.open(uploaded_file_b), caption="Bパターン画像", use_container_width=True)
                 if st.button("🚀 Bパターンを採点", key="score_b_btn"):
-                    # プラン制限と回数消費のロジックは削除
-                    # if st.session_state.plan == "Free": ... elif st.session_state.remaining_uses <= 0: ... else: ...
-                    
-                    # GASへの記録のみを行う
-                    image_b_bytes = io.BytesIO() # Create BytesIO object for image
-                    Image.open(uploaded_file_b).save(image_b_bytes, format="PNG") # Save uploaded image to BytesIO
-                    img_str_b = base64.b64encode(image_b_bytes.getvalue()).decode() # OpenAI Vision API用
+                    # Add plan-based restriction for B-pattern here
+                    if st.session_state.plan == "Free": # Check if user is on Free plan
+                        st.warning("この機能はFreeプランではご利用いただけません。")
+                        st.info("Bパターン診断はLightプラン以上でご利用可能です。プランのアップグレードをご検討ください。")
+                    elif st.session_state.remaining_uses <= 0:
+                        st.warning(f"残り回数がありません。（{st.session_state.plan}プラン）")
+                        st.info("利用回数を増やすには、プランのアップグレードが必要です。")
+                    else:
+                        # Decrement uses in Firestore via auth_utils
+                        if auth_utils.update_user_uses_in_firestore_rest(st.session_state["user"], st.session_state["id_token"]): 
+                            image_b_bytes = io.BytesIO() # Create BytesIO object for image
+                            Image.open(uploaded_file_b).save(image_b_bytes, format="PNG") # Save uploaded image to BytesIO
+                            image_filename_b = f"banner_B_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
+                            
+                            # Upload image to Firebase Storage
+                            image_url_b = auth_utils.upload_image_to_firebase_storage(
+                                st.session_state["user"], 
+                                image_b_bytes, 
+                                image_filename_b
+                            )
 
-                    with st.spinner("AIがBパターンを採点中です..."):
-                        try:
-                            ai_prompt_text = f"""
+                            if image_url_b: # Proceed if image upload was successful
+                                with st.spinner("AIがBパターンを採点中です..."):
+                                    try:
+                                        ai_prompt_text = f"""
 以下のバナー画像をプロ視点で採点してください。
 この広告のターゲット年代は「{age_group}」で、主な目的は「{purpose}」です。
 
@@ -430,56 +459,56 @@ with col1:
 スコア：{score_format}
 改善コメント：2～3行でお願いします
 ---"""
-                            response_b = client.chat.completions.create(
-                                model="gpt-4o",
-                                messages=[
-                                    {"role": "system", "content": "あなたは広告のプロです。"},
-                                    {"role": "user", "content": [
-                                        {"type": "text", "text": ai_prompt_text},
-                                        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str_b}"}}
-                                    ]}
-                                ],
-                                max_tokens=600
-                            )
-                            content_b = response_b.choices[0].message.content
-                            st.session_state.ai_response_b = content_b
+                                    response_b = client.chat.completions.create(
+                                        model="gpt-4o",
+                                        messages=[
+                                            {"role": "system", "content": "あなたは広告のプロです。"},
+                                            {"role": "user", "content": [
+                                                {"type": "text", "text": ai_prompt_text},
+                                                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str_b}"}}
+                                            ]}
+                                        ],
+                                        max_tokens=600
+                                    )
+                                    content_b = response_b.choices[0].message.content
+                                    st.session_state.ai_response_b = content_b
 
-                            score_match_b = re.search(r"スコア[:：]\s*(.+)", content_b)
-                            comment_match_b = re.search(r"改善コメント[:：]\s*(.+)", content_b)
-                            st.session_state.score_b = score_match_b.group(1).strip() if score_match_b else "取得できず"
-                            st.session_state.comment_b = comment_match_b.group(1).strip() if comment_match_b else "取得できず"
+                                    score_match_b = re.search(r"スコア[:：]\s*(.+)", content_b)
+                                    comment_match_b = re.search(r"改善コメント[:：]\s*(.+)", content_b)
+                                    st.session_state.score_b = score_match_b.group(1).strip() if score_match_b else "取得できず"
+                                    st.session_state.comment_b = comment_match_b.group(1).strip() if comment_match_b else "取得できず"
 
-                            # Send data to Google Apps Script (GAS)
-                            data_b = {
-                                "sheet_name": "record_log",
-                                "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                                "platform": sanitize(platform),
-                                "category": sanitize(category),
-                                "industry": sanitize(industry),
-                                "age_group": sanitize(age_group),
-                                "purpose": sanitize(purpose),
-                                "score": sanitize(st.session_state.score_b),
-                                "comment": sanitize(st.session_state.comment_b),
-                                "result": sanitize(result_input), # User-entered arbitrary AI eval result
-                                "follower_gain": sanitize(follower_gain_input),
-                                "memo": sanitize(memo_input),
-                                # "image_url": image_url_b # Firebase Storage削除のためコメントアウト
-                            }
-                            try:
-                                response_gas_b = requests.post(GAS_URL, json=data_b)
-                                if response_gas_b.status_code == 200:
-                                    pass # Success message hidden
-                                else:
-                                    st.error(f"❌ スプレッドシート送信エラー（Bパターン）: ステータスコード {response_gas_b.status_code}, 応答: {response_gas_b.text}")
-                            except requests.exceptions.RequestException as e:
-                                st.error(f"GASへのデータ送信中にネットワークエラーが発生しました（Bパターン）: {str(e)}")
-                            except Exception as e:
-                                st.error(f"GASへのデータ送信中に予期せぬエラーが発生しました（Bパターン）: {str(e)}")
+                                    # Prepare data for Firestore
+                                    firestore_record_data = {
+                                        "timestamp": datetime.now().isoformat() + "Z", # ISO 8601 format for Firestore timestamp
+                                        "platform": sanitize(platform),
+                                        "category": sanitize(category),
+                                        "industry": sanitize(industry),
+                                        "age_group": sanitize(age_group),
+                                        "purpose": sanitize(purpose),
+                                        "score": sanitize(st.session_state.score_b),
+                                        "comment": sanitize(st.session_state.comment_b),
+                                        "result": sanitize(result_input), # User-entered arbitrary AI eval result
+                                        "follower_gain": sanitize(follower_gain_input),
+                                        "memo": sanitize(memo_input),
+                                        "image_url": image_url_b # Add image URL to Firestore data
+                                    }
+                                    # Send data to Firestore
+                                    if auth_utils.add_diagnosis_record_to_firestore(
+                                        st.session_state["user"], 
+                                        st.session_state["id_token"], 
+                                        firestore_record_data
+                                    ):
+                                        st.success("📊 診断結果をFirestoreに記録しました！")
+                                    else:
+                                        st.error("❌ 診断結果のFirestore記録に失敗しました。")
 
-                        except Exception as e:
-                            st.error(f"AI採点中にエラーが発生しました（Bパターン）: {str(e)}")
-                            st.session_state.score_b = "エラー"
-                            st.session_state.comment_b = "AI応答エラー"
+                                except Exception as e:
+                                    st.error(f"AI採点中にエラーが発生しました（Bパターン）: {str(e)}")
+                                    st.session_state.score_b = "エラー"
+                                    st.session_state.comment_b = "AI応答エラー"
+                        else:
+                            st.error("利用回数の更新に失敗しました。") # Error message if Firestore update fails
                     st.success("Bパターンの診断が完了しました！")
 
             with result_col_b:
@@ -506,7 +535,7 @@ with col1:
                                     model="gpt-4o",
                                     messages=[
                                         {"role": "system", "content": "あなたは広告表現の専門家です。"},
-                                        {"role": "user", "content": yakijihou_prompt_b}
+                                        {"role": "user", "content": yakujihou_prompt_b}
                                     ],
                                     max_tokens=500,
                                     temperature=0.3,
