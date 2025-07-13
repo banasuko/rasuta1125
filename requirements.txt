@@ -2,6 +2,5 @@ streamlit
 pillow
 requests
 openai
-# pydrive2 # Google Drive連携を使わないなら削除してOK
-# firebase-admin # Firestore/Admin SDK削除のためコメントアウト
+firebase-admin # ✅ Firestore/Admin SDK再統合のため追加
 python-dotenv
