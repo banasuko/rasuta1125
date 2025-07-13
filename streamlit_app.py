@@ -12,7 +12,7 @@ import auth_utils # Import auth_utils.py
 
 
 # Google Apps Script (GAS) and Google Drive information (GAS for legacy spreadsheet, will be removed later if not needed)
-GAS_URL = "https://script.google.com/macros/s/AKfycby_uD6Jtb9GT0-atbyPKOPc8uyVKodwYVIQ2Tpe-_E8uTOPiir0Ce1NAPZDEOlCUxN4/exec" # Update this URL to your latest GAS deployment URL
+GAS_URL = "https://script.google.com/macros/s/AKfycby_uD6Jtb9GT0-atbyPKOPc8uyVKodwYVIQ2Tpe-_E8uTOPiir0Ce1NAPZDEOlCUxN4/exec" # このURLを更新してください
 
 
 # Helper function to sanitize values
@@ -91,7 +91,7 @@ st.markdown(
         box-shadow: 0px 6px 15px rgba(0, 0, 255, 0.3);
     }
     .stButton > button:active {
-        background-color: #0000CC; /* Darker blue on click */
+        background-color: #0000CC;
         box-shadow: none;
     }
 
@@ -274,7 +274,6 @@ with col1:
             with img_col_a:
                 st.image(Image.open(uploaded_file_a), caption="Aパターン画像", use_container_width=True)
                 if st.button("🚀 Aパターンを採点", key="score_a_btn"):
-                    # Check remaining uses
                     if st.session_state.remaining_uses <= 0:
                         st.warning(f"残り回数がありません。（{st.session_state.plan}プラン）")
                         st.info("利用回数を増やすには、プランのアップグレードが必要です。")
@@ -379,7 +378,7 @@ with col1:
                     if industry in ["美容", "健康", "医療"]:
                         with st.spinner("⚖️ 薬機法チェックを実行中（Aパターン）..."):
                             yakujihou_prompt_a = f"""
-以下の広告文（改善コメント）が薬機法に違反していないかをチェックしてください。
+以下の広告文（改善コメント）が、薬機法に違反していないかをチェックしてください。
 ※これはバナー画像の内容に対するAIの改善コメントであり、実際の広告文ではありません。
 
 ---
@@ -412,35 +411,37 @@ with col1:
         st.markdown("---")
 
         # --- B Pattern Processing ---
-if uploaded_file_b:
-    img_col_b, result_col_b = st.columns([1, 2])
+        if uploaded_file_b:
+            img_col_b, result_col_b = st.columns([1, 2])
 
-    with img_col_b:
-        st.image(Image.open(uploaded_file_b), caption="Bパターン画像", use_container_width=True)
-        if st.button("🚀 Bパターンを採点", key="score_b_btn"):
-            # Add plan-based restriction for B-pattern here
-            if st.session_state.plan == "Free":
-                st.warning("この機能はFreeプランではご利用いただけません。")
-                st.info("Bパターン診断はLightプラン以上でご利用可能です。プランのアップグレードをご検討ください。")
-            elif st.session_state.remaining_uses <= 0:
-                st.warning(f"残り回数がありません。（{st.session_state.plan}プラン）")
-                st.info("利用回数を増やすには、プランのアップグレードが必要です。")
-            else:
-                if auth_utils.update_user_uses_in_firestore_rest(st.session_state["user"], st.session_state["id_token"]): 
-                    image_b_bytes = io.BytesIO()
-                    Image.open(uploaded_file_b).save(image_b_bytes, format="PNG")
-                    image_filename_b = f"banner_B_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
+            with img_col_b:
+                st.image(Image.open(uploaded_file_b), caption="Bパターン画像", use_container_width=True)
+                if st.button("🚀 Bパターンを採点", key="score_b_btn"):
+                    # Add plan-based restriction for B-pattern here
+                    if st.session_state.plan == "Free": # Check if user is on Free plan
+                        st.warning("この機能はFreeプランではご利用いただけません。")
+                        st.info("Bパターン診断はLightプラン以上でご利用可能です。プランのアップグレードをご検討ください。")
+                    elif st.session_state.remaining_uses <= 0:
+                        st.warning(f"残り回数がありません。（{st.session_state.plan}プラン）")
+                        st.info("利用回数を増やすには、プランのアップグレードが必要です。")
+                    else:
+                        # Decrement uses in Firestore via auth_utils
+                        if auth_utils.update_user_uses_in_firestore_rest(st.session_state["user"], st.session_state["id_token"]): 
+                            image_b_bytes = io.BytesIO() # Create BytesIO object for image
+                            Image.open(uploaded_file_b).save(image_b_bytes, format="PNG") # Save uploaded image to BytesIO
+                            image_filename_b = f"banner_B_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
+                            
+                            # Upload image to Firebase Storage
+                            image_url_b = auth_utils.upload_image_to_firebase_storage(
+                                st.session_state["user"], 
+                                image_b_bytes, 
+                                image_filename_b
+                            )
 
-                    image_url_b = auth_utils.upload_image_to_firebase_storage(
-                        st.session_state["user"], 
-                        image_b_bytes, 
-                        image_filename_b
-                    )
-
-                    if image_url_b:
-                        with st.spinner("AIがBパターンを採点中です..."):
-                            try:
-                                ai_prompt_text = f"""
+                            if image_url_b: # Proceed if image upload was successful
+                                with st.spinner("AIがBパターンを採点中です..."):
+                                    try:
+                                        ai_prompt_text = f"""
 以下のバナー画像をプロ視点で採点してください。
 この広告のターゲット年代は「{age_group}」で、主な目的は「{purpose}」です。
 
@@ -458,19 +459,17 @@ if uploaded_file_b:
 スコア：{score_format}
 改善コメント：2～3行でお願いします
 ---"""
-
-                                response_b = client.chat.completions.create(
-                                    model="gpt-4o",
-                                    messages=[
-                                        {"role": "system", "content": "あなたは広告のプロです。"},
-                                        {"role": "user", "content": [
-                                            {"type": "text", "text": ai_prompt_text},
-                                            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str_b}"}}
-                                        ]}
-                                    ],
-                                    max_tokens=600
-                                )
-
+                                    response_b = client.chat.completions.create(
+                                        model="gpt-4o",
+                                        messages=[
+                                            {"role": "system", "content": "あなたは広告のプロです。"},
+                                            {"role": "user", "content": [
+                                                {"type": "text", "text": ai_prompt_text},
+                                                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str_b}"}}
+                                            ]}
+                                        ],
+                                        max_tokens=600
+                                    )
                                     content_b = response_b.choices[0].message.content
                                     st.session_state.ai_response_b = content_b
 
