@@ -469,7 +469,6 @@ if uploaded_file_b:
                                         ]}
                                     ],
                                     max_tokens=600
-                                )
                                     )
                                     content_b = response_b.choices[0].message.content
                                     st.session_state.ai_response_b = content_b
