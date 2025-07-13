@@ -12,7 +12,7 @@ import auth_utils # Import auth_utils.py
 
 
 # Google Apps Script (GAS) and Google Drive information (GAS for legacy spreadsheet, will be removed later if not needed)
-GAS_URL = "https://script.google.com/macros/s/AKfycby_uD6Jtb9GT0-atbyPKOPc8uyVKodwYVIQ2Tpe-_E8uTOPiir0Ce1NAPZDEOlCUxN4/exec" # このURLを更新してください
+GAS_URL = "https://script.google.com/macros/s/AKfycby_uD6Jtb9GT0-atbyPKOPc8uyVKodwYVIQ2Tpe-_E8uTOPiir0Ce1NAPZDEOlCUxN4/exec" # Update this URL to your latest GAS deployment URL
 
 
 # Helper function to sanitize values
@@ -91,7 +91,7 @@ st.markdown(
         box-shadow: 0px 6px 15px rgba(0, 0, 255, 0.3);
     }
     .stButton > button:active {
-        background-color: #0000CC;
+        background-color: #0000CC; /* Darker blue on click */
         box-shadow: none;
     }
 
@@ -274,6 +274,7 @@ with col1:
             with img_col_a:
                 st.image(Image.open(uploaded_file_a), caption="Aパターン画像", use_container_width=True)
                 if st.button("🚀 Aパターンを採点", key="score_a_btn"):
+                    # Check remaining uses
                     if st.session_state.remaining_uses <= 0:
                         st.warning(f"残り回数がありません。（{st.session_state.plan}プラン）")
                         st.info("利用回数を増やすには、プランのアップグレードが必要です。")
@@ -378,7 +379,7 @@ with col1:
                     if industry in ["美容", "健康", "医療"]:
                         with st.spinner("⚖️ 薬機法チェックを実行中（Aパターン）..."):
                             yakujihou_prompt_a = f"""
-以下の広告文（改善コメント）が、薬機法に違反していないかをチェックしてください。
+以下の広告文（改善コメント）が薬機法に違反していないかをチェックしてください。
 ※これはバナー画像の内容に対するAIの改善コメントであり、実際の広告文ではありません。
 
 ---
@@ -615,3 +616,4 @@ with col2:
     st.markdown("---")
     st.info(
         "💡 **ヒント:** スコアやコメントは、広告改善のヒントとしてご活用ください。AIの提案は参考情報であり、最終的な判断は人間が行う必要があります。"
+    )
