@@ -1,7 +1,3 @@
-はい、承知いたしました。
-エラーを修正した全文コードはこちらです。
-
-```python
 import streamlit as st
 import base64
 import io
