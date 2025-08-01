@@ -1,10 +1,11 @@
 # auth_utils.py
+
 import streamlit as st
 import os
 import requests
 from dotenv import load_dotenv
 import firebase_admin
-from firebase_admin import credentials, firestore, storage 
+from firebase_admin import credentials, firestore, storage
 import json
 from datetime import datetime
 
@@ -31,13 +32,16 @@ if not FIREBASE_PROJECT_ID:
 FIREBASE_FIRESTORE_BASE_URL = f"https://firestore.googleapis.com/v1/projects/{FIREBASE_PROJECT_ID}/databases/(default)/documents/"
 
 
+# ★★★ 修正点1: グローバル変数としてdbを初期化 ★★★
+db = None
+
 # --- Firebase Admin SDKの初期化 (Firestore & Storage用) ---
 try:
     if "firebase_admin_initialized" not in st.session_state:
         admin_project_id = os.getenv("FIREBASE_PROJECT_ID_ADMIN")
         admin_private_key_raw = os.getenv("FIREBASE_PRIVATE_KEY_ADMIN")
         admin_client_email = os.getenv("FIREBASE_CLIENT_EMAIL_ADMIN")
-        storage_bucket = os.getenv("FIREBASE_STORAGE_BUCKET") 
+        storage_bucket = os.getenv("FIREBASE_STORAGE_BUCKET")
 
         # 必須の環境変数が設定されているかチェック
         missing_vars = []
@@ -51,7 +55,6 @@ try:
             st.stop()
 
         # private_keyを正しく解析するために改行コードを置換
-        # Streamlit Secretsが \n を \\n として渡す場合があるため
         admin_private_key = admin_private_key_raw.replace('\\n', '\n')
 
         # サービスアカウント情報（辞書形式で構築）
@@ -72,7 +75,10 @@ try:
         cred = credentials.Certificate(service_account_info)
         firebase_admin.initialize_app(cred, {'storageBucket': storage_bucket}) # Storageバケット名を指定して初期化
         st.session_state.firebase_admin_initialized = True
+        
+        # ★★★ 修正点2: グローバル変数のdbにクライアントを代入 ★★★
         db = firestore.client() # Firestoreクライアントを初期化
+
 except Exception as e:
     st.error(f"❌ Firebase Admin SDKの初期化に失敗しました。サービスアカウントキーを確認してください: {e}")
     st.error(f"エラー詳細: {e}")
@@ -92,8 +98,9 @@ if "plan" not in st.session_state:
     st.session_state.plan = "Guest"
 if "remaining_uses" not in st.session_state:
     st.session_state.remaining_uses = 0
-if "firebase_initialized" not in st.session_state: # Admin SDK初期化のtry-exceptで制御されるため、ここはTrueのまま
-    st.session_state.firebase_initialized = True
+# firebase_admin_initialized は上のtry-exceptで制御するため、このキーは不要
+# if "firebase_initialized" not in st.session_state:
+#     st.session_state.firebase_initialized = True
 
 
 # --- Firebase Authentication REST APIの関数 ---
@@ -127,7 +134,7 @@ def create_user_with_email_and_password(email, password):
 # --- Firestoreの操作関数 (Admin SDKを使用) ---
 def get_user_data_from_firestore(uid, id_token):
     """Firestoreからユーザーのプランと利用回数を取得する (Admin SDK)"""
-    global db 
+    global db
     doc_ref = db.collection('users').document(uid)
     doc = doc_ref.get()
     if doc.exists:
@@ -136,7 +143,7 @@ def get_user_data_from_firestore(uid, id_token):
         st.session_state.remaining_uses = data.get("remaining_uses", 0)
     else:
         st.session_state.plan = "Free"
-        st.session_state.remaining_uses = 5 
+        st.session_state.remaining_uses = 5
         doc_ref.set({
             "email": st.session_state.email,
             "plan": st.session_state.plan,
@@ -167,12 +174,6 @@ def update_user_uses_in_firestore_rest(uid, id_token, uses_to_deduct=1):
 def upload_image_to_firebase_storage(uid, image_bytes_io, filename):
     """
     画像をFirebase Storageにアップロードし、公開URLを返す。
-    Args:
-        uid (str): ユーザーID (画像をユーザーフォルダに整理するため)
-        image_bytes_io (io.BytesIO): PIL ImageをBytesIOに変換したデータ
-        filename (str): 保存するファイル名 (例: banner_A_YYYYMMDDHHMMSS.png)
-    Returns:
-        str: アップロードされた画像の公開URL, またはNone (失敗時)
     """
     try:
         bucket = storage.bucket() # Firebase Admin SDKで初期化されたStorageバケットを取得
@@ -193,13 +194,6 @@ def upload_image_to_firebase_storage(uid, image_bytes_io, filename):
 def add_diagnosis_record_to_firestore(uid, id_token, record_data, image_url=None):
     """
     ユーザーの診断記録をFirestoreのdiagnosesサブコレクションに追加する。
-    Args:
-        uid (str): ユーザーID
-        id_token (str): ユーザーのIDトークン
-        record_data (dict): 記録したい診断データ
-        image_url (str, optional): アップロードされた画像のURL. Defaults to None.
-    Returns:
-        bool: 成功すればTrue, 失敗すればFalse
     """
     global db
     doc_ref = db.collection('users').document(uid).collection('diagnoses').document()
@@ -209,7 +203,7 @@ def add_diagnosis_record_to_firestore(uid, id_token, record_data, image_url=None
             record_data["image_url"] = image_url
         record_data["created_at"] = firestore.SERVER_TIMESTAMP
         
-        doc_ref.set(record_data) 
+        doc_ref.set(record_data)
         return True
     except Exception as e:
         st.error(f"診断記録のFirestore保存に失敗しました: {e}")
@@ -245,7 +239,7 @@ def login_page():
                 except requests.exceptions.HTTPError as e:
                     error_json = e.response.json()
                     error_code = error_json.get("error", {}).get("message", "Unknown error")
-                    if error_code == "EMAIL_NOT_FOUND" or error_code == "INVALID_PASSWORD":
+                    if error_code == "EMAIL_NOT_FOUND" or error_code == "INVALID_PASSWORD" or error_code == "INVALID_LOGIN_CREDENTIALS":
                         st.error("ログインに失敗しました。メールアドレスまたはパスワードが間違っています。")
                     elif error_code == "USER_DISABLED":
                         st.error("このアカウントは無効化されています。")
@@ -282,38 +276,34 @@ def login_page():
 
 def logout():
     """ユーザーをログアウトさせる関数"""
-    if st.session_state.get("logged_in"):
-        keys_to_clear = ["user", "email", "logged_in", "id_token", "plan", "remaining_uses",
-                         "score_a", "comment_a", "yakujihou_a", "score_b", "comment_b", "yakujihou_b",
-                         "ai_response_a", "ai_response_b"]
-        for key in st.session_state:
-            if key in st.session_state:
-                del st.session_state[key]
-        st.success("ログアウトしました。")
-        st.rerun()
+    keys_to_clear = list(st.session_state.keys()) # ログアウト時にクリアするキーのリスト
+    for key in keys_to_clear:
+        if key in st.session_state:
+            del st.session_state[key]
+    st.success("ログアウトしました。")
+    st.rerun()
 
 def check_login():
     """
     ユーザーのログイン状態をチェックし、未ログインならログインページを表示してアプリの実行を停止する。
-    Firestoreの残り回数も確認し、サイドバーに表示する。
     """
-    if not st.session_state.get("firebase_admin_initialized"):
-        st.stop() 
+    if 'db' not in globals() or db is None:
+        st.error("データベース接続が確立されていません。アプリを再読み込みしてください。")
+        st.stop()
 
     if st.session_state.get("logged_in"):
         st.sidebar.write(f"ようこそ, {st.session_state.get('email')}!")
         
-        if "remaining_uses" not in st.session_state or st.session_state.remaining_uses is None:
-            if st.session_state.id_token:
-                get_user_data_from_firestore(st.session_state["user"], st.session_state.id_token)
+        # ログイン時にFirestoreのデータを読み込む
+        if "plan" not in st.session_state or st.session_state.plan == "Guest":
+            if st.session_state.get("id_token"):
+                 get_user_data_from_firestore(st.session_state["user"], st.session_state.id_token)
             else:
-                st.sidebar.warning("IDトークンがありません。ログインし直してください。")
+                st.sidebar.warning("IDトークンがありません。再ログインしてください。")
                 logout()
                 return
-        
-        st.sidebar.write(f"残り回数: {st.session_state.remaining_uses}回 ({st.session_state.plan}プラン)")
-        st.sidebar.button("ログアウト", on_click=logout)
 
-    if not st.session_state.get("logged_in"):
+        st.sidebar.button("ログアウト", on_click=logout)
+    else:
         login_page()
         st.stop()
