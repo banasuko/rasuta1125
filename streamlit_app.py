@@ -11,7 +11,7 @@ from openai import OpenAI
 import auth_utils # Import auth_utils.py
 
 
-# Google Apps Script (GAS) and Google Drive information
+# Google Apps Script (GAS) and Google Drive information (GAS for legacy spreadsheet, will be removed later if not needed)
 GAS_URL = "https://script.google.com/macros/s/AKfycby_uD6Jtb9GT0-atbyPKOPc8uyVKodwYVIQ2Tpe-_E8uTOPiir0Ce1NAPZDEOlCUxN4/exec" # このURLを更新してください
 
 
@@ -151,7 +151,7 @@ st.markdown(
         color: #333333;
     }
 
-    /* Info, Success, Warning, Error boxes */
+    /* Info, Success, Warning, Errorボックス */
     .stAlert {
         color: #333333;
     }
@@ -278,6 +278,7 @@ with col1:
                         st.warning(f"残り回数がありません。（{st.session_state.plan}プラン）")
                         st.info("利用回数を増やすには、プランのアップグレードが必要です。")
                     else:
+                        # Decrement uses in Firestore via auth_utils
                         if auth_utils.update_user_uses_in_firestore_rest(st.session_state["user"], st.session_state["id_token"]): 
                             image_a_bytes = io.BytesIO() # Create BytesIO object for image
                             Image.open(uploaded_file_a).save(image_a_bytes, format="PNG") # Save uploaded image to BytesIO
