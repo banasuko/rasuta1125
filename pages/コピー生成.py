@@ -48,7 +48,7 @@ tone = st.selectbox("トーン（雰囲気）を選択", ["親しみやすい", 
 
 # 4. コピー生成数 (プランに応じた上限設定)
 # Get current plan from session state
-user_plan = st.session_state.get("plan", "Free") 
+user_plan = st.session_state.get("plan", "Guest") 
 
 # Determine max copy count based on plan
 max_copy_count_per_request = 0 # Default for Free/Guest
@@ -82,6 +82,7 @@ else:
         index=0 if 0 in copy_count_options_available else (copy_count_options_available.index(2) if 2 in copy_count_options_available else 0)
     )
 
+
 # 5. 生成ボタン
 if st.button("コピーを生成する"):
     # First, check if the user can use this feature at all based on plan
@@ -95,15 +96,14 @@ if st.button("コピーを生成する"):
     elif copy_count == 0: # If copy_count is 0 due to no options
         st.warning("コピー生成数が選択されていません。")
     else:
-        # If plan allows and uses are available, proceed to consume and generate
-        if auth_utils.update_user_uses_in_firestore_rest(st.session_state["user"], st.session_state["id_token"]): # Consume 1 use
-            with st.spinner("コピー案を生成中..."):
-                # Yakujiho check required categories
-                needs_yakkihou = category in ["脱毛サロン", "エステ", "ホワイトニング"]
+        # If plan allows and uses are available, proceed to generate
+        with st.spinner("コピー案を生成中..."):
+            # Yakujiho check required categories
+            needs_yakkihou = category in ["脱毛サロン", "エステ", "ホワイトニング"]
 
-                # Prompt construction
-                system_prompt = "あなたは優秀な広告コピーライターです。"
-                user_prompt = f"""
+            # Prompt construction
+            system_prompt = "あなたは優秀な広告コピーライターです。"
+            user_prompt = f"""
 以下の情報をもとに、バナー広告に使えるキャッチコピーを{copy_count}案提案してください。
 【業種】{category}
 【ターゲット層】{target}
@@ -114,26 +114,23 @@ if st.button("コピーを生成する"):
 { '・薬機法に配慮し、「治る」「即効」「永久」「医療行為的表現」などは避けてください。' if needs_yakkihou else '' }
 """
 
-                try:
-                    response = client.chat.completions.create(
-                        model="gpt-4o", # Using GPT-4o for copy generation
-                        messages=[
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": user_prompt}
-                        ]
-                    )
+            try:
+                response = client.chat.completions.create(
+                    model="gpt-4o", # Using GPT-4o for copy generation
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt}
+                    ]
+                )
 
-                    output = response.choices[0].message.content.strip()
+                output = response.choices[0].message.content.strip()
 
-                    st.subheader("✍️ コピー案")
-                    st.markdown(output)
+                st.subheader("✍️ コピー案")
+                st.markdown(output)
 
-                    if needs_yakkihou:
-                        st.subheader("🔍 薬機法チェック")
-                        st.info("※ このカテゴリーでは薬機法に配慮した表現になっているか注意してください。\nNGワード例：「即効」「治る」「永久」など")
+                if needs_yakkihou:
+                    st.subheader("🔍 薬機法チェック")
+                    st.info("※ このカテゴリーでは薬機法に配慮した表現になっているか注意してください。\nNGワード例：「即効」「治る」「永久」など")
 
-                except Exception as e:
-                    st.error(f"コピー生成中にエラーが発生しました：{e}")
-        else:
-            st.error("利用回数の更新に失敗しました。コピー生成は実行されませんでした。")
-
+            except Exception as e:
+                st.error(f"コピー生成中にエラーが発生しました：{e}")
