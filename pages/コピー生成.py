@@ -48,7 +48,7 @@ tone = st.selectbox("トーン（雰囲気）を選択", ["親しみやすい", 
 
 # 4. コピー生成数 (プランに応じた上限設定)
 # Get current plan from session state
-user_plan = st.session_state.get("plan", "Guest") 
+user_plan = st.session_state.get("plan", "Guest")
 
 # Determine max copy count based on plan
 max_copy_count_per_request = 0 # Default for Free/Guest
@@ -61,7 +61,7 @@ elif user_plan == "Pro":
     max_copy_count_per_request = 5
     copy_count_options_available = [1, 2, 3, 4, 5]
 elif user_plan in ["Team", "Enterprise"]: # Team and Enterprise
-    max_copy_count_per_request = 10 
+    max_copy_count_per_request = 10
     copy_count_options_available = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 else: # Free or Guest plan
     max_copy_count_per_request = 0 # Free plan cannot generate copies
@@ -77,8 +77,8 @@ elif not copy_count_options_available: # Should not happen if logic is correct, 
     copy_count = 0
 else:
     copy_count = st.selectbox(
-        f"コピー生成数を選んでください (プラン上限: {max_copy_count_per_request}案)", 
-        copy_count_options_available, 
+        f"コピー生成数を選んでください (プラン上限: {max_copy_count_per_request}案)",
+        copy_count_options_available,
         index=0 if 0 in copy_count_options_available else (copy_count_options_available.index(2) if 2 in copy_count_options_available else 0)
     )
 
