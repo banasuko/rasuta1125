@@ -29,6 +29,143 @@ st.set_page_config(layout="wide", page_title="バナスコAI")
 # メカニックテーマを適用
 apply_mechanic_theme()
 
+# カスタムCSS（元のGensparkデザインに近づける）
+st.markdown("""
+<style>
+    /* メイン背景をダークテーマに */
+    .main {
+        background-color: #0a0a1a !important;
+        color: #00ff88 !important;
+    }
+    
+    /* サイドバー */
+    .css-1d391kg, .css-6qob1r {
+        background-color: #1a1a2e !important;
+        color: #00ff88 !important;
+    }
+    
+    /* タイトルのスタイル */
+    h1 {
+        color: #00ffff !important;
+        text-align: center !important;
+        text-shadow: 0 0 15px #00ffff !important;
+        background: linear-gradient(145deg, #1a1a2e, #16213e) !important;
+        padding: 20px !important;
+        border-radius: 10px !important;
+        margin-bottom: 20px !important;
+    }
+    
+    h2, h3 {
+        color: #00ffff !important;
+        text-shadow: 0 0 10px #00ffff !important;
+    }
+    
+    /* コンテナ（ボーダー付き） */
+    .css-1kyxreq {
+        background: linear-gradient(145deg, #1a1a2e, #16213e) !important;
+        border: 2px solid #00ffff !important;
+        border-radius: 10px !important;
+        box-shadow: 0 0 20px rgba(0, 255, 255, 0.3) !important;
+    }
+    
+    /* 入力フィールド */
+    .stTextInput > div > div > input,
+    .stTextArea > div > div > textarea {
+        background-color: #16213e !important;
+        color: #00ff88 !important;
+        border: 1px solid #00ffff !important;
+        border-radius: 5px !important;
+    }
+    
+    /* セレクトボックス */
+    .stSelectbox > div > div,
+    .stSelectbox select {
+        background-color: #16213e !important;
+        color: #00ff88 !important;
+        border: 1px solid #00ffff !important;
+        border-radius: 5px !important;
+    }
+    
+    /* ボタン */
+    .stButton > button {
+        background: linear-gradient(45deg, #00ffff, #00ff88) !important;
+        color: #0a0a1a !important;
+        border: none !important;
+        border-radius: 8px !important;
+        font-weight: bold !important;
+        box-shadow: 0 0 15px rgba(0, 255, 255, 0.5) !important;
+        transition: all 0.3s ease !important;
+    }
+    
+    .stButton > button:hover {
+        transform: translateY(-2px) !important;
+        box-shadow: 0 5px 25px rgba(0, 255, 255, 0.8) !important;
+    }
+    
+    /* エキスパンダー */
+    .streamlit-expanderHeader {
+        background-color: #16213e !important;
+        color: #00ffff !important;
+        border: 1px solid #00ffff !important;
+        border-radius: 5px !important;
+    }
+    
+    /* メトリック表示 */
+    .css-1xarl3l {
+        background: linear-gradient(145deg, #16213e, #1a1a2e) !important;
+        padding: 10px !important;
+        border-radius: 8px !important;
+        border: 1px solid #00ffff !important;
+    }
+    
+    /* 成功メッセージ */
+    .stSuccess {
+        background-color: rgba(0, 255, 136, 0.1) !important;
+        border: 1px solid #00ff88 !important;
+        color: #00ff88 !important;
+    }
+    
+    /* 警告メッセージ */
+    .stWarning {
+        background-color: rgba(255, 193, 7, 0.1) !important;
+        border: 1px solid #ffc107 !important;
+        color: #ffc107 !important;
+    }
+    
+    /* エラーメッセージ */
+    .stError {
+        background-color: rgba(255, 82, 82, 0.1) !important;
+        border: 1px solid #ff5252 !important;
+        color: #ff5252 !important;
+    }
+    
+    /* インフォメッセージ */
+    .stInfo {
+        background-color: rgba(0, 255, 255, 0.1) !important;
+        border: 1px solid #00ffff !important;
+        color: #00ffff !important;
+    }
+    
+    /* ラジオボタン */
+    .stRadio > div {
+        background-color: #16213e !important;
+        padding: 10px !important;
+        border-radius: 5px !important;
+        border: 1px solid #00ffff !important;
+    }
+    
+    /* スピナー */
+    .stSpinner > div {
+        border-top-color: #00ffff !important;
+    }
+    
+    /* プログレスバー */
+    .stProgress .css-pxxe24 {
+        background-color: #00ffff !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # --- Logo Display ---
 logo_path = "banasuko_logo_icon.png"
 
