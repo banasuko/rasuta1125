@@ -10,11 +10,10 @@ from openai import OpenAI
 
 import auth_utils # Import auth_utils.py
 
-# メカニックテーマを追加
-from streamlit_mechanic_theme import apply_mechanic_theme
 
 # Google Apps Script (GAS) and Google Drive information (GAS for legacy spreadsheet, will be removed later if not needed)
 GAS_URL = "https://script.google.com/macros/s/AKfycby_uD6Jtb9GT0-atbyPKOPc8uyVKodwYVIQ2Tpe-_E8uTOPiir0Ce1NAPZDEOlCUxN4/exec" # Update this URL to your latest GAS deployment URL
+
 
 # Helper function to sanitize values
 def sanitize(value):
@@ -23,148 +22,9 @@ def sanitize(value):
         return "エラー"
     return value
 
+
 # Streamlit UI configuration
 st.set_page_config(layout="wide", page_title="バナスコAI")
-
-# メカニックテーマを適用
-apply_mechanic_theme()
-
-# カスタムCSS（元のGensparkデザインに近づける）
-st.markdown("""
-<style>
-    /* メイン背景をダークテーマに */
-    .main {
-        background-color: #0a0a1a !important;
-        color: #00ff88 !important;
-    }
-    
-    /* サイドバー */
-    .css-1d391kg, .css-6qob1r {
-        background-color: #1a1a2e !important;
-        color: #00ff88 !important;
-    }
-    
-    /* タイトルのスタイル */
-    h1 {
-        color: #00ffff !important;
-        text-align: center !important;
-        text-shadow: 0 0 15px #00ffff !important;
-        background: linear-gradient(145deg, #1a1a2e, #16213e) !important;
-        padding: 20px !important;
-        border-radius: 10px !important;
-        margin-bottom: 20px !important;
-    }
-    
-    h2, h3 {
-        color: #00ffff !important;
-        text-shadow: 0 0 10px #00ffff !important;
-    }
-    
-    /* コンテナ（ボーダー付き） */
-    .css-1kyxreq {
-        background: linear-gradient(145deg, #1a1a2e, #16213e) !important;
-        border: 2px solid #00ffff !important;
-        border-radius: 10px !important;
-        box-shadow: 0 0 20px rgba(0, 255, 255, 0.3) !important;
-    }
-    
-    /* 入力フィールド */
-    .stTextInput > div > div > input,
-    .stTextArea > div > div > textarea {
-        background-color: #16213e !important;
-        color: #00ff88 !important;
-        border: 1px solid #00ffff !important;
-        border-radius: 5px !important;
-    }
-    
-    /* セレクトボックス */
-    .stSelectbox > div > div,
-    .stSelectbox select {
-        background-color: #16213e !important;
-        color: #00ff88 !important;
-        border: 1px solid #00ffff !important;
-        border-radius: 5px !important;
-    }
-    
-    /* ボタン */
-    .stButton > button {
-        background: linear-gradient(45deg, #00ffff, #00ff88) !important;
-        color: #0a0a1a !important;
-        border: none !important;
-        border-radius: 8px !important;
-        font-weight: bold !important;
-        box-shadow: 0 0 15px rgba(0, 255, 255, 0.5) !important;
-        transition: all 0.3s ease !important;
-    }
-    
-    .stButton > button:hover {
-        transform: translateY(-2px) !important;
-        box-shadow: 0 5px 25px rgba(0, 255, 255, 0.8) !important;
-    }
-    
-    /* エキスパンダー */
-    .streamlit-expanderHeader {
-        background-color: #16213e !important;
-        color: #00ffff !important;
-        border: 1px solid #00ffff !important;
-        border-radius: 5px !important;
-    }
-    
-    /* メトリック表示 */
-    .css-1xarl3l {
-        background: linear-gradient(145deg, #16213e, #1a1a2e) !important;
-        padding: 10px !important;
-        border-radius: 8px !important;
-        border: 1px solid #00ffff !important;
-    }
-    
-    /* 成功メッセージ */
-    .stSuccess {
-        background-color: rgba(0, 255, 136, 0.1) !important;
-        border: 1px solid #00ff88 !important;
-        color: #00ff88 !important;
-    }
-    
-    /* 警告メッセージ */
-    .stWarning {
-        background-color: rgba(255, 193, 7, 0.1) !important;
-        border: 1px solid #ffc107 !important;
-        color: #ffc107 !important;
-    }
-    
-    /* エラーメッセージ */
-    .stError {
-        background-color: rgba(255, 82, 82, 0.1) !important;
-        border: 1px solid #ff5252 !important;
-        color: #ff5252 !important;
-    }
-    
-    /* インフォメッセージ */
-    .stInfo {
-        background-color: rgba(0, 255, 255, 0.1) !important;
-        border: 1px solid #00ffff !important;
-        color: #00ffff !important;
-    }
-    
-    /* ラジオボタン */
-    .stRadio > div {
-        background-color: #16213e !important;
-        padding: 10px !important;
-        border-radius: 5px !important;
-        border: 1px solid #00ffff !important;
-    }
-    
-    /* スピナー */
-    .stSpinner > div {
-        border-top-color: #00ffff !important;
-    }
-    
-    /* プログレスバー */
-    .stProgress .css-pxxe24 {
-        background-color: #00ffff !important;
-    }
-</style>
-""", unsafe_allow_html=True)
 
 # --- Logo Display ---
 logo_path = "banasuko_logo_icon.png"
@@ -187,11 +47,174 @@ if not openai_api_key:
     st.stop()
 client = OpenAI(api_key=openai_api_key)
 
-# 注意：元のCSSは削除（メカニックテーマが適用されるため）
+
+# --- Custom CSS (White background and Newpeace-inspired theme) ---
+st.markdown(
+    """
+    <style>
+    /* Force white background for the entire body */
+    body {
+        background-color: #FFFFFF !important;
+        background-image: none !important; /* Disable any background images */
+    }
+
+    /* Streamlit's main content container */
+    .main .block-container {
+        background-color: #FFFFFF; /* Main container background to white */
+        padding-top: 2rem;
+        padding-right: 2rem;
+        padding-left: 2rem;
+        padding-bottom: 2rem;
+        border-radius: 12px;
+        box-shadow: 0px 8px 20px rgba(0, 0, 0, 0.08); /* Soft shadow */
+    }
+
+    /* Sidebar styling */
+    .stSidebar {
+        background-color: #F8F8F8; /* Slightly off-white/light gray */
+        border-right: none;
+        box-shadow: 2px 0px 10px rgba(0, 0, 0, 0.05);
+    }
+    
+    /* Button styling */
+    .stButton > button {
+        background-color: #0000FF; /* Primary color (vibrant blue) */
+        color: white;
+        border-radius: 8px;
+        border: none;
+        box-shadow: 0px 4px 10px rgba(0, 0, 255, 0.2);
+        transition: background-color 0.2s, box-shadow 0.2s;
+        font-weight: bold;
+    }
+    .stButton > button:hover {
+        background-color: #3333FF; /* Lighter blue on hover */
+        box-shadow: 0px 6px 15px rgba(0, 0, 255, 0.3);
+    }
+    .stButton > button:active {
+        background-color: #0000CC; /* Darker blue on click */
+        box-shadow: none;
+    }
+
+    /* Expander styling */
+    .stExpander {
+        border: 1px solid #E0E0E0;
+        border-radius: 8px;
+        background-color: #FFFFFF;
+        box-shadow: 0px 2px 5px rgba(0,0,0,0.05); /* Soft shadow */
+    }
+    .stExpander > div > div { /* Header part */
+        background-color: #F8F8F8; /* Match secondaryBackgroundColor */
+        border-bottom: 1px solid #E0E0E0;
+        border-top-left-radius: 8px;
+        border-top-right-radius: 8px;
+    }
+    .stExpanderDetails { /* Expanded content part */
+        background-color: #FFFFFF;
+    }
+
+    /* Text input, selectbox, textarea styling */
+    div[data-baseweb="input"] input,
+    div[data-baseweb="select"] span,
+    div[data-baseweb="textarea"] textarea,
+    .stSelectbox .st-bv, /* Selectbox display value */
+    .stTextInput .st-eb, /* Text input display */
+    .stTextArea .st-eb /* Textarea display */
+    {
+        background-color: #FFFFFF !important;
+        color: #333333 !important;
+        border-radius: 8px;
+        border: 1px solid #E0E0E0;
+        box-shadow: inset 0px 1px 3px rgba(0,0,0,0.05); /* Subtle inner shadow */
+    }
+    /* Focus styling for input elements */
+    div[data-baseweb="input"] input:focus,
+    div[data-baseweb="select"] span:focus,
+    div[data-baseweb="textarea"] textarea:focus,
+    div[data-baseweb="input"]:focus-within,
+    div[data-baseweb="select"]:focus-within,
+    div[data-baseweb="textarea"]:focus-within {
+        border-color: #0000FF;
+        box-shadow: 0 0 0 2px rgba(0, 0, 255, 0.3);
+    }
+
+    /* メトリック */
+    [data-testid="stMetricValue"] {
+        color: #FFD700; /* 鮮やかな黄色 (Newpeaceの黄色をイメージ) */
+        font-size: 2.5rem;
+        font-weight: bold;
+    }
+    [data-testid="stMetricLabel"] {
+        color: #666666;
+        font-size: 0.9rem;
+    }
+    [data-testid="stMetricDelta"] {
+        color: #333333;
+    }
+
+    /* Info, Success, Warning, Error boxes */
+    .stAlert {
+        color: #333333;
+    }
+    .stAlert.stAlert-info {
+        background-color: #E0EFFF;
+        border-left-color: #0000FF;
+    }
+    .stAlert.stAlert-success {
+        background-color: #E0FFE0;
+        border-left-color: #00AA00;
+    }
+    .stAlert.stAlert-warning {
+        background-color: #FFFBE0;
+        border-left-color: #FFD700;
+    }
+    .stAlert.stAlert-error {
+        background-color: #FFE0E0;
+        border-left-color: #FF0000;
+    }
+
+    /* コードブロック */
+    code {
+        background-color: #F0F0F0 !important;
+        color: #000080 !important;
+        border-radius: 5px;
+        padding: 0.2em 0.4em;
+    }
+    pre code {
+        background-color: #F0F0F0 !important;
+        padding: 1em !important;
+        overflow-x: auto;
+    }
+
+    /* サイドバーのテキスト色を調整 */
+    .stSidebar [data-testid="stText"],
+    .stSidebar [data-testid="stMarkdownContainer"],
+    .stSidebar .st-emotion-cache-1jm692h {
+        color: #333333;
+    }
+
+    /* セレクトボックスのドロップダウンリストの背景色 */
+    div[data-baseweb="popover"] > div {
+        background-color: #FFFFFF !important;
+        color: #333333 !important;
+    }
+    /* セレクトボックスのドロップダウンリストのアイテムのテキスト色 */
+    div[data-baseweb="popover"] > div > ul > li {
+        color: #333333 !important;
+    }
+    /* セレクトボックスのドロップダウンリストのホバー色 */
+    div[data-baseweb="popover"] > div > ul > li[data-mouse-entered="true"] {
+        background-color: #E0EFFF !important; /* 薄い青 */
+        color: #0000FF !important; /* アクセントの青 */
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+# --- カスタムCSSの終わり ---
 
 # --- アプリケーション本体（ログイン済みの場合のみ実行） ---
 st.title("🧠 バナー広告 採点AI - バナスコ")
-st.subheader("〜もう、無駄打ちしない。広告を\"武器\"に変えるAIツール〜")
+st.subheader("〜もう、無駄打ちしない。広告を“武器”に変えるAIツール〜")
 
 col1, col2 = st.columns([2, 1])
 
