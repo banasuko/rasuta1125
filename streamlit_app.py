@@ -137,9 +137,9 @@ st.markdown(
         box-shadow: 0 0 0 2px rgba(0, 0, 255, 0.3);
     }
 
-    /* メトリック */
+    /* Metric */
     [data-testid="stMetricValue"] {
-        color: #FFD700; /* 鮮やかな黄色 (Newpeaceの黄色をイメージ) */
+        color: #FFD700; /* Vibrant yellow (Newpeace yellow) */
         font-size: 2.5rem;
         font-weight: bold;
     }
@@ -172,7 +172,7 @@ st.markdown(
         border-left-color: #FF0000;
     }
 
-    /* コードブロック */
+    /* Code block */
     code {
         background-color: #F0F0F0 !important;
         color: #000080 !important;
@@ -185,34 +185,34 @@ st.markdown(
         overflow-x: auto;
     }
 
-    /* サイドバーのテキスト色を調整 */
+    /* Adjust sidebar text color */
     .stSidebar [data-testid="stText"],
     .stSidebar [data-testid="stMarkdownContainer"],
     .stSidebar .st-emotion-cache-1jm692h {
         color: #333333;
     }
 
-    /* セレクトボックスのドロップダウンリストの背景色 */
+    /* Selectbox dropdown background */
     div[data-baseweb="popover"] > div {
         background-color: #FFFFFF !important;
         color: #333333 !important;
     }
-    /* セレクトボックスのドロップダウンリストのアイテムのテキスト色 */
+    /* Selectbox dropdown item text color */
     div[data-baseweb="popover"] > div > ul > li {
         color: #333333 !important;
     }
-    /* セレクトボックスのドロップダウンリストのホバー色 */
+    /* Selectbox dropdown hover color */
     div[data-baseweb="popover"] > div > ul > li[data-mouse-entered="true"] {
-        background-color: #E0EFFF !important; /* 薄い青 */
-        color: #0000FF !important; /* アクセントの青 */
+        background-color: #E0EFFF !important; /* Light blue */
+        color: #0000FF !important; /* Accent blue */
     }
     </style>
     """,
     unsafe_allow_html=True
 )
-# --- カスタムCSSの終わり ---
+# --- End of Custom CSS ---
 
-# --- アプリケーション本体（ログイン済みの場合のみ実行） ---
+# --- Main Application (executes only if logged in) ---
 st.title("🧠 バナー広告 採点AI - バナスコ")
 st.subheader("〜もう、無駄打ちしない。広告を“武器”に変えるAIツール〜")
 
@@ -278,7 +278,8 @@ with col1:
                         st.info("利用回数を増やすには、プランのアップグレードが必要です。")
                     else:
                         # Decrement uses in Firestore via auth_utils
-                        if auth_utils.update_user_uses_in_firestore_rest(st.session_state["user"], st.session_state["id_token"]):
+                        # CORRECTION 1: Corrected function name by removing "_rest"
+                        if auth_utils.update_user_uses_in_firestore(st.session_state["user"]):
                             image_a_bytes = io.BytesIO() # Create BytesIO object for image
                             Image.open(uploaded_file_a).save(image_a_bytes, format="PNG") # Save uploaded image to BytesIO
                             image_filename_a = f"banner_A_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
@@ -334,7 +335,6 @@ with col1:
 
                                         # Prepare data for Firestore
                                         firestore_record_data = {
-                                            "timestamp": datetime.now().isoformat() + "Z", # ISO 8601 format for Firestore timestamp
                                             "platform": sanitize(platform),
                                             "category": sanitize(category),
                                             "industry": sanitize(industry),
@@ -350,7 +350,6 @@ with col1:
                                         # Send data to Firestore
                                         if auth_utils.add_diagnosis_record_to_firestore(
                                             st.session_state["user"],
-                                            st.session_state["id_token"],
                                             firestore_record_data
                                         ):
                                             st.success("📊 診断結果をFirestoreに記録しました！")
@@ -425,7 +424,8 @@ with col1:
                         st.info("利用回数を増やすには、プランのアップグレードが必要です。")
                     else:
                         # Decrement uses in Firestore via auth_utils
-                        if auth_utils.update_user_uses_in_firestore_rest(st.session_state["user"], st.session_state["id_token"]):
+                        # CORRECTION 2: Corrected function name by removing "_rest"
+                        if auth_utils.update_user_uses_in_firestore(st.session_state["user"]):
                             image_b_bytes = io.BytesIO() # Create BytesIO object for image
                             Image.open(uploaded_file_b).save(image_b_bytes, format="PNG") # Save uploaded image to BytesIO
                             image_filename_b = f"banner_B_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
@@ -481,7 +481,6 @@ with col1:
         
                                         # Prepare data for Firestore
                                         firestore_record_data = {
-                                            "timestamp": datetime.now().isoformat() + "Z", # ISO 8601 format for Firestore timestamp
                                             "platform": sanitize(platform),
                                             "category": sanitize(category),
                                             "industry": sanitize(industry),
@@ -497,7 +496,6 @@ with col1:
                                         # Send data to Firestore
                                         if auth_utils.add_diagnosis_record_to_firestore(
                                             st.session_state["user"],
-                                            st.session_state["id_token"],
                                             firestore_record_data
                                         ):
                                             st.success("📊 診断結果をFirestoreに記録しました！")
