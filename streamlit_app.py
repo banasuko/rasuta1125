@@ -71,7 +71,7 @@ st.markdown(
     
     body {
         background: transparent !important;
-        color: #000000 !important; /* 全体の文字色を黒に変更 */
+        color: #ffffff !important; /* 全体の文字色を白に戻す */
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
     }
 
@@ -237,7 +237,7 @@ st.markdown(
     .stTextInput .st-eb,
     .stTextArea .st-eb {
         background: rgba(26, 32, 44, 0.8) !important;
-        color: #000000 !important; /* 文字色を黒に変更 */
+        color: #ffffff !important; /* 文字色を白に戻す */
         border: 2px solid rgba(255, 255, 255, 0.2) !important;
         border-radius: 16px !important;
         font-family: 'Inter', sans-serif !important;
@@ -510,7 +510,7 @@ st.markdown(
 
     /* Professional text styling */
     p, div, span, label {
-        color: #000000 !important; /* 文字色を黒に変更 */
+        color: #ffffff !important; /* 文字色を白に戻す */
         font-family: 'Inter', sans-serif !important;
         font-weight: 400 !important;
         line-height: 1.7 !important;
@@ -518,7 +518,7 @@ st.markdown(
     
     /* Markdown content styling */
     .stMarkdown {
-        color: #000000 !important; /* 文字色を黒に変更 */
+        color: #ffffff !important; /* 文字色を白に戻す */
     }
     
     .stMarkdown p {
