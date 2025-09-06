@@ -1,3 +1,58 @@
+import streamlit as st
+import base64
+import io
+import os
+import re
+import requests
+from PIL import Image
+from datetime import datetime
+from openai import OpenAI
+
+# auth_utils は、プロジェクトに存在するファイルに置き換える必要があります。
+# 例: auth_utils.py など
+# import auth_utils 
+
+
+# Google Apps Script (GAS) and Google Drive information (GAS for legacy spreadsheet, will be removed later if not needed)
+GAS_URL = "https://script.google.com/macros/s/AKfycby_uD6Jtb9GT0-atbyPKOPc8uyVKodwYVIQ2Tpe-_E8uTOPiir0Ce1NAPZDEOlCUxN4/exec" # Update this URL to your latest GAS deployment URL
+
+
+# Helper function to sanitize values
+def sanitize(value):
+    """Replaces None or specific strings with 'エラー' (Error)"""
+    if value is None or value == "取得できず":
+        return "エラー"
+    return value
+
+
+# Streamlit UI configuration
+st.set_page_config(layout="wide", page_title="バナスコAI")
+
+# --- Logo Display ---
+logo_path = "banasuko_logo_icon.png"
+
+try:
+    logo_image = Image.open(logo_path)
+    st.sidebar.image(logo_image, use_container_width=True) # Display logo in sidebar, adjusting to column width
+except FileNotFoundError:
+    st.sidebar.error(f"ロゴ画像 '{logo_path}' が見つかりません。ファイルが正しく配置されているか確認してください。")
+
+# --- Login Check ---
+# This is crucial! Code below this line will only execute if the user is logged in.
+# auth_utils.check_login()
+
+# --- OpenAI Client Initialization ---
+# Initialize OpenAI client after login check, when OpenAI API key is available from environment variables
+openai_api_key = os.getenv("OPENAI_API_KEY")
+if openai_api_key:
+    client = OpenAI(api_key=openai_api_key)
+else:
+    # For demo purposes without API key
+    client = None
+    st.warning("デモモード - OpenAI APIが設定されていません")
+
+
+# --- Ultimate Professional CSS Theme ---
 st.markdown(
     """
     <style>
@@ -214,7 +269,7 @@ st.markdown(
         transform: translateY(-2px) scale(1.01) !important;
         background: rgba(26, 32, 44, 0.9) !important;
     }
-    
+
     /* ULTIMATE METRIC DISPLAY - Push Streamlit's limits */
     [data-testid="stMetricValue"] {
         font-family: 'JetBrains Mono', monospace !important;
