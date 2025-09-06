@@ -1,3 +1,56 @@
+import streamlit as st
+import base64
+import io
+import os
+import re
+import requests
+from PIL import Image
+from datetime import datetime
+from openai import OpenAI
+
+import auth_utils # Import Firebase authentication
+
+
+# Google Apps Script (GAS) and Google Drive information (GAS for legacy spreadsheet, will be removed later if not needed)
+GAS_URL = "https://script.google.com/macros/s/AKfycby_uD6Jtb9GT0-atbyPKOPc8uyVKodwYVIQ2Tpe-_E8uTOPiir0Ce1NAPZDEOlCUxN4/exec" # Update this URL to your latest GAS deployment URL
+
+
+# Helper function to sanitize values
+def sanitize(value):
+    """Replaces None or specific strings with 'エラー' (Error)"""
+    if value is None or value == "取得できず":
+        return "エラー"
+    return value
+
+
+# Streamlit UI configuration
+st.set_page_config(layout="wide", page_title="バナスコAI")
+
+# --- Logo Display ---
+logo_path = "banasuko_logo_icon.png"
+
+try:
+    logo_image = Image.open(logo_path)
+    st.sidebar.image(logo_image, use_container_width=True) # Display logo in sidebar, adjusting to column width
+except FileNotFoundError:
+    st.sidebar.error(f"ロゴ画像 '{logo_path}' が見つかりません。ファイルが正しく配置されているか確認してください。")
+
+# --- Login Check ---
+# This is crucial! Code below this line will only execute if the user is logged in.
+auth_utils.check_login()
+
+# --- OpenAI Client Initialization ---
+# Initialize OpenAI client after login check, when OpenAI API key is available from environment variables
+openai_api_key = os.getenv("OPENAI_API_KEY")
+if openai_api_key:
+    client = OpenAI(api_key=openai_api_key)
+else:
+    # For demo purposes without API key
+    client = None
+    st.warning("デモモード - OpenAI APIが設定されていません")
+
+
+# --- Ultimate Professional CSS Theme ---
 st.markdown(
     """
     <style>
@@ -412,31 +465,67 @@ st.markdown(
         color: rgba(255, 255, 255, 1) !important;
     }
 
-    /* --- ↓↓↓ ここから修正を適用しました ↓↓↓ --- */
+    /* Ultimate title styling */
+    h1 {
+        font-size: 5rem !important;
+        font-weight: 900 !important;
+        background: linear-gradient(135deg, #38bdf8 0%, #a855f7 20%, #3b82f6 40%, #06d6a0 60%, #f59e0b 80%, #38bdf8 100%) !important;
+        background-size: 600% 600% !important;
+        -webkit-background-clip: text !important;
+        -webkit-text-fill-color: transparent !important;
+        background-clip: text !important;
+        text-align: center !important;
+        margin: 2rem 0 !important;
+        letter-spacing: -0.05em !important;
+        animation: mega-gradient-shift 12s ease-in-out infinite !important;
+        text-shadow: 0 0 80px rgba(56, 189, 248, 0.5) !important;
+        transform: perspective(1000px) rotateX(10deg);
+    }
     
-    /* ヘッダー、見出し、テキスト全般の文字色を白に戻す */
-    h1, h2, h3, h4, h5, h6, 
-    p, div, span, label,
-    .stMarkdown,
-    [data-testid="stMetricLabel"],
-    [data-testid="stMetricDelta"] {
+    @keyframes mega-gradient-shift {
+        0%, 100% { background-position: 0% 50%; }
+        20% { background-position: 100% 0%; }
+        40% { background-position: 100% 100%; }
+        60% { background-position: 50% 100%; }
+        80% { background-position: 0% 100%; }
+    }
+    
+    h2 {
+        color: #ffffff !important;
+        font-family: 'Inter', sans-serif !important;
+        font-weight: 600 !important;
+        font-size: 1.6rem !important;
+        text-align: center !important;
+        margin-bottom: 3rem !important;
+        letter-spacing: 0.05em !important;
+    }
+    
+    h3, h4, h5, h6 {
+        color: #ffffff !important;
+        font-family: 'Inter', sans-serif !important;
+        font-weight: 700 !important;
+        letter-spacing: 0.025em !important;
+    }
+
+    /* Professional text styling */
+    p, div, span, label {
+        color: #ffffff !important;
+        font-family: 'Inter', sans-serif !important;
+        font-weight: 400 !important;
+        line-height: 1.7 !important;
+    }
+    
+    /* Markdown content styling */
+    .stMarkdown {
         color: #ffffff !important;
     }
-
-    /* 入力フォームの文字色を白に戻す */
-    div[data-baseweb="input"] input,
-    div[data-baseweb="select"] span,
-    div[data-baseweb="textarea"] textarea {
-        color: #ffffff !important;
-    }
-
-    /* 「しまう」という文字を非表示にする */
-    .stExpander > button > div:last-child {
-        display: none;
-    }
-
-    /* --- ↑↑↑ ここまで修正を適用しました ↑↑↑ --- */
     
+    .stMarkdown p {
+        font-size: 1rem !important;
+        line-height: 1.8 !important;
+        margin-bottom: 1rem !important;
+    }
+
     /* Ultimate file uploader styling */
     .stFileUploader {
         border: 3px dashed rgba(56, 189, 248, 0.7) !important;
@@ -549,7 +638,6 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-# --- End of Ultimate Professional CSS ---
 
 
 # --- Clean Professional Header ---
