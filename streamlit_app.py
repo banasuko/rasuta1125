@@ -8,9 +8,7 @@ from PIL import Image
 from datetime import datetime
 from openai import OpenAI
 
-# auth_utils は、プロジェクトに存在するファイルに置き換える必要があります。
-# 例: auth_utils.py など
-# import auth_utils 
+import auth_utils # Import Firebase authentication
 
 
 # Google Apps Script (GAS) and Google Drive information (GAS for legacy spreadsheet, will be removed later if not needed)
@@ -39,7 +37,7 @@ except FileNotFoundError:
 
 # --- Login Check ---
 # This is crucial! Code below this line will only execute if the user is logged in.
-# auth_utils.check_login()
+auth_utils.check_login()
 
 # --- OpenAI Client Initialization ---
 # Initialize OpenAI client after login check, when OpenAI API key is available from environment variables
@@ -871,7 +869,7 @@ with col1:
                             else:
                                 st.warning(f"薬機法チェック：{st.session_state.yakujihou_a}")
                         except Exception as e:
-                            st.error(f"薬機法チェック中にエラーが発生しました（Aパターン）: {str(e)}")
+                            st.error(f"AI採点中にエラーが発生しました（Aパターン）: {str(e)}")
                             st.session_state.yakujihou_a = "エラー"
 
     # --- B Pattern Processing ---
