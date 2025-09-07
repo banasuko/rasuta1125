@@ -234,7 +234,11 @@ st.markdown(
     div[data-baseweb="textarea"] textarea,
     .stSelectbox .st-bv,
     .stTextInput .st-eb,
-    .stTextArea .st-eb {
+    .stTextArea .st-eb,
+    /* --- More robust selectors for text color --- */
+    [data-testid="stTextInput"] input,
+    [data-testid="stSelectbox"] span,
+    [data-testid="stTextarea"] textarea {
         background: rgba(26, 32, 44, 0.8) !important;
         color: #FBC02D !important; /* CHANGED TO YELLOW */
         border: 2px solid rgba(255, 255, 255, 0.2) !important;
