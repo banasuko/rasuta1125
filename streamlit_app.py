@@ -745,33 +745,33 @@ with col1:
     st.subheader("📝 バナー診断フォーム")
 
     with st.expander("基本情報", expanded=True):
-        user_name = st.text_input("ユーザー名", key="user_name_input")
+        user_name = st.text_input("ユーザー名", key="user_name")
         age_group = st.selectbox(
             "ターゲット年代",
             ["指定なし", "10代", "20代", "30代", "40代", "50代", "60代以上"],
-            key="age_group_select"
+            key="age_group"
         )
-        platform = st.selectbox("媒体", ["Instagram", "GDN", "YDN"], key="platform_select")
-        category = st.selectbox("カテゴリ", ["広告", "投稿"] if platform == "Instagram" else ["広告"], key="category_select")
-        has_ad_budget = st.selectbox("広告予算", ["あり", "なし"], key="budget_budget_select")
+        platform = st.selectbox("媒体", ["Instagram", "GDN", "YDN"], key="platform")
+        category = st.selectbox("カテゴリ", ["広告", "投稿"] if platform == "Instagram" else ["広告"], key="category")
+        has_ad_budget = st.selectbox("広告予算", ["あり", "なし"], key="has_ad_budget")
         
         purpose = st.selectbox(
             "目的",
             ["プロフィール誘導", "リンククリック", "保存数増加", "インプレッション増加"],
-            key="purpose_select"
+            key="purpose"
         )
 
     with st.expander("詳細設定", expanded=True):
-        industry = st.selectbox("業種", ["美容", "飲食", "不動産", "子ども写真館", "その他"], key="industry_select")
-        genre = st.selectbox("ジャンル", ["お客様の声", "商品紹介", "ノウハウ", "世界観", "キャンペーン"], key="genre_select")
-        score_format = st.radio("スコア形式", ["A/B/C", "100点満点"], horizontal=True, key="score_format_radio")
-        ab_pattern = st.radio("ABテストパターン", ["Aパターン", "Bパターン", "該当なし"], horizontal=True, key="ab_pattern_radio")
-        banner_name = st.text_input("バナー名", key="banner_name_input")
+        industry = st.selectbox("業種", ["美容", "飲食", "不動産", "子ども写真館", "その他"], key="industry")
+        genre = st.selectbox("ジャンル", ["お客様の声", "商品紹介", "ノウハウ", "世界観", "キャンペーン"], key="genre")
+        score_format = st.radio("スコア形式", ["A/B/C", "100点満点"], horizontal=True, key="score_format")
+        ab_pattern = st.radio("ABテストパターン", ["Aパターン", "Bパターン", "該当なし"], horizontal=True, key="ab_pattern")
+        banner_name = st.text_input("バナー名", key="banner_name")
 
     with st.expander("任意項目", expanded=False):
-        result_input = st.text_input("AI評価結果（任意）", help="AIが生成した評価結果を記録したい場合に入力します。", key="result_input_text")
-        follower_gain_input = st.text_input("フォロワー増加数（任意）", help="Instagramなどのフォロワー増加数があれば入力します。", key="follower_gain_input_text")
-        memo_input = st.text_area("メモ（任意）", help="その他、特記事項があれば入力してください。", key="memo_input_area")
+        result_input = st.text_input("AI評価結果（任意）", help="AIが生成した評価結果を記録したい場合に入力します。", key="result_input")
+        follower_gain_input = st.text_input("フォロワー増加数（任意）", help="Instagramなどのフォロワー増加数があれば入力します。", key="follower_gain")
+        memo_input = st.text_area("メモ（任意）", help="その他、特記事項があれば入力してください。", key="memo_input")
 
     # Clean Upload Header
     st.subheader("📸 画像アップロード・AI診断")
@@ -796,7 +796,7 @@ with col1:
 
         with img_col_a:
             st.image(Image.open(uploaded_file_a), caption="Aパターン画像", use_container_width=True)
-            if st.button("Aパターンを採点", key="score_a_btn"):
+            if st.button("Aパターンを採点", key="score_a"):
                 # Check remaining uses
                 if st.session_state.remaining_uses <= 0:
                     st.warning(f"残り回数がありません。（{st.session_state.plan}プラン）")
@@ -949,7 +949,7 @@ with col1:
     
         with img_col_b:
             st.image(Image.open(uploaded_file_b), caption="Bパターン画像", use_container_width=True)
-            if st.button("Bパターンを採点", key="score_b_btn"):
+            if st.button("Bパターンを採点", key="score_b"):
                 # Add plan-based restriction for B-pattern here
                 if st.session_state.plan == "Free":
                     st.warning("この機能はFreeプランではご利用いただけません。")
@@ -1105,7 +1105,7 @@ with col1:
         st.markdown("---")
         st.markdown("### ⚖️ A/Bテスト比較分析")
         
-        if st.button("A/Bテスト比較を実行", key="ab_compare_final_btn"):
+        if st.button("A/Bテスト比較を実行", key="ab_compare"):
             with st.spinner("AIがA/Bパターンを比較しています..."):
                 ab_compare_prompt = f"""
 以下のAパターンとBパターンの広告診断結果を比較し、総合的にどちらが優れているか、その理由と具体的な改善点を提案してください。
