@@ -217,7 +217,7 @@ st.markdown(
         font-size: 1.2rem !important;
         text-transform: uppercase;
     }
-    /* 「しまう」という文字を非表示にする */
+    /* Hide the "Collapse" text on the expander */
     .stExpander > button > div:last-child {
         display: none;
     }
@@ -228,7 +228,7 @@ st.markdown(
         padding: 2.5rem !important;
     }
 
-    /* Ultimate input styling */
+    /* Ultimate input styling - MODIFIED */
     div[data-baseweb="input"] input,
     div[data-baseweb="select"] span,
     div[data-baseweb="textarea"] textarea,
@@ -236,7 +236,7 @@ st.markdown(
     .stTextInput .st-eb,
     .stTextArea .st-eb {
         background: rgba(26, 32, 44, 0.8) !important;
-        color: #ffffff !important;
+        color: #FBC02D !important; /* CHANGED TO YELLOW */
         border: 2px solid rgba(255, 255, 255, 0.2) !important;
         border-radius: 16px !important;
         font-family: 'Inter', sans-serif !important;
@@ -654,12 +654,12 @@ st.markdown("---")
 st.markdown("""
 <div style="text-align: center; margin: 2rem 0;">
     <span style="background: linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(168, 85, 247, 0.2)); 
-                 padding: 1rem 2rem; 
-                 border-radius: 50px; 
-                 border: 1px solid rgba(255, 255, 255, 0.2); 
-                 color: rgba(255, 255, 255, 0.9);
-                 font-weight: 600;
-                 letter-spacing: 0.1em;">
+                    padding: 1rem 2rem; 
+                    border-radius: 50px; 
+                    border: 1px solid rgba(255, 255, 255, 0.2); 
+                    color: rgba(255, 255, 255, 0.9);
+                    font-weight: 600;
+                    letter-spacing: 0.1em;">
         Professional Banner Analysis Platform
     </span>
 </div>
@@ -1080,7 +1080,7 @@ Bパターン診断結果:
 1. さらなる高級感を演出するためのエフェクト強化
 2. ターゲット層により特化したメッセージング最適化
 ---"""
-                    
+                        
                     # Simple comparison results display
                     st.markdown("#### 📊 A/Bテスト比較結果")
                     st.success(ab_compare_content)
