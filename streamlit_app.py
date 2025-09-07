@@ -638,6 +638,71 @@ st.markdown(
             0 20px 45px rgba(0, 0, 0, 0.3),
             inset 0 2px 0 rgba(255, 255, 255, 0.2) !important;
     }
+
+    /* === 入力欄の文字色を黄色に（値・キャレット・プレースホルダー） === */
+    .stTextInput input,
+    .stTextArea textarea,
+    div[data-baseweb="input"] input {
+      color: #FBC02D !important;
+      caret-color: #FBC02D !important;
+    }
+    .stTextInput input::placeholder,
+    .stTextArea textarea::placeholder,
+    div[data-baseweb="input"] input::placeholder {
+      color: rgba(251, 192, 45, 0.6) !important;
+    }
+    .stTextInput input:disabled,
+    .stTextArea textarea:disabled,
+    div[data-baseweb="input"] input:disabled {
+      color: rgba(251, 192, 45, 0.5) !important;
+    }
+    
+    /* === セレクトの表示値（閉じている時のテキスト）を黄色に === */
+    div[data-baseweb="select"] span,
+    div[data-baseweb="select"] div[role="button"] {
+      color: #FBC02D !important;
+    }
+    
+    /* ▼アイコンも黄色に */
+    div[data-baseweb="select"] svg {
+      color: #FBC02D !important;
+      fill: #FBC02D !important;
+      opacity: 0.95 !important;
+    }
+    
+    /* === セレクトのドロップダウン（ポップオーバー）は body 直下に出るのでグローバル指定 === */
+    /* 背景をダーク、文字を白にして可読性を確保 */
+    [data-baseweb="popover"],
+    [role="listbox"],
+    [data-baseweb="menu"] {
+      background: rgba(26, 32, 44, 0.95) !important;
+      border: 2px solid rgba(255, 255, 255, 0.2) !important;
+      border-radius: 20px !important;
+      box-shadow: 0 30px 60px rgba(0,0,0,0.4) !important;
+      z-index: 9999 !important;
+    }
+    [data-baseweb="popover"] ul li,
+    [role="option"],
+    [data-baseweb="menu"] li {
+      color: #ffffff !important;
+    }
+    [role="option"][aria-selected="true"],
+    [data-baseweb="menu"] li[aria-selected="true"],
+    [data-baseweb="menu"] li:hover {
+      background: linear-gradient(135deg, rgba(56,189,248,0.3), rgba(168,85,247,0.3)) !important;
+      color: #ffffff !important;
+    }
+    
+    /* === その他の本文・見出しは白のまま維持（既存指定がある場合でもOK） === */
+    h1, h2, h3, h4, h5, h6,
+    .stMarkdown, .stMarkdown p,
+    p, div, span, label {
+      color: #ffffff !important;
+    }
+    
+    /* しまう の文言は非表示（既存ルールの再掲） */
+    .stExpander > button > div:last-child { display: none !important; }
+
     </style>
     """,
     unsafe_allow_html=True
