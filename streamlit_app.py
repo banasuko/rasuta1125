@@ -180,7 +180,7 @@ st.markdown(
             0 15px 30px rgba(56, 189, 248, 0.4),
             0 8px 20px rgba(168, 85, 247, 0.3) !important;
     }
-
+    
     /* Ultimate input styling - MODIFIED */
     div[data-baseweb="input"] input,
     div[data-baseweb="select"] span,
@@ -511,7 +511,7 @@ with col1:
 
         with img_col_a:
             st.image(Image.open(uploaded_file_a), caption="Aパターン画像", use_container_width=True)
-            if st.button("Aパターンを採点", key="score_a"):
+            if st.button("Aパターンを採点", key="score_a_btn"):
                 # Check remaining uses
                 if st.session_state.remaining_uses <= 0:
                     st.warning(f"残り回数がありません。（{st.session_state.plan}プラン）")
@@ -664,7 +664,7 @@ with col1:
     
         with img_col_b:
             st.image(Image.open(uploaded_file_b), caption="Bパターン画像", use_container_width=True)
-            if st.button("Bパターンを採点", key="score_b"):
+            if st.button("Bパターンを採点", key="score_b_btn"):
                 # Add plan-based restriction for B-pattern here
                 if st.session_state.plan == "Free":
                     st.warning("この機能はFreeプランではご利用いただけません。")
@@ -820,7 +820,7 @@ with col1:
         st.markdown("---")
         st.markdown("### ⚖️ A/Bテスト比較分析")
         
-        if st.button("A/Bテスト比較を実行", key="ab_compare"):
+        if st.button("A/Bテスト比較を実行", key="ab_compare_btn"):
             with st.spinner("AIがA/Bパターンを比較しています..."):
                 ab_compare_prompt = f"""
 以下のAパターンとBパターンの広告診断結果を比較し、総合的にどちらが優れているか、その理由と具体的な改善点を提案してください。
@@ -872,7 +872,7 @@ Bパターン診断結果:
                     st.error(f"A/Bテスト比較中にエラーが発生しました: {str(e)}")
 
 with col2:
-    st.markdown("### 採点基準はこちら")
+    st.markdown("### 採点基準")
     with st.container():
         st.markdown("バナスコAIは以下の観点に基づいて広告画像を評価します。")
         st.markdown(
