@@ -744,7 +744,8 @@ with col1:
     # Clean Form Header
     st.subheader("📝 バナー診断フォーム")
 
-    with st.expander("基本情報", expanded=True):
+    st.markdown("### 基本情報")
+    with st.container():
         user_name = st.text_input("ユーザー名", key="user_name")
         age_group = st.selectbox(
             "ターゲット年代",
@@ -761,14 +762,16 @@ with col1:
             key="purpose"
         )
 
-    with st.expander("詳細設定", expanded=True):
+    st.markdown("### 詳細設定")
+    with st.container():
         industry = st.selectbox("業種", ["美容", "飲食", "不動産", "子ども写真館", "その他"], key="industry")
         genre = st.selectbox("ジャンル", ["お客様の声", "商品紹介", "ノウハウ", "世界観", "キャンペーン"], key="genre")
         score_format = st.radio("スコア形式", ["A/B/C", "100点満点"], horizontal=True, key="score_format")
         ab_pattern = st.radio("ABテストパターン", ["Aパターン", "Bパターン", "該当なし"], horizontal=True, key="ab_pattern")
         banner_name = st.text_input("バナー名", key="banner_name")
 
-    with st.expander("任意項目", expanded=False):
+    st.markdown("### 任意項目")
+    with st.container():
         result_input = st.text_input("AI評価結果（任意）", help="AIが生成した評価結果を記録したい場合に入力します。", key="result_input")
         follower_gain_input = st.text_input("フォロワー増加数（任意）", help="Instagramなどのフォロワー増加数があれば入力します。", key="follower_gain")
         memo_input = st.text_area("メモ（任意）", help="その他、特記事項があれば入力してください。", key="memo_input")
@@ -1157,7 +1160,8 @@ Bパターン診断結果:
                     st.error(f"A/Bテスト比較中にエラーが発生しました: {str(e)}")
 
 with col2:
-    with st.expander("採点基準はこちら", expanded=True):
+    st.markdown("### 採点基準")
+    with st.container():
         st.markdown("バナスコAIは以下の観点に基づいて広告画像を評価します。")
         st.markdown(
             """
