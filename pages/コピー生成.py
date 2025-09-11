@@ -149,54 +149,7 @@ st.markdown(
             0 15px 30px rgba(56, 189, 248, 0.4),
             0 8px 20px rgba(168, 85, 247, 0.3) !important;
     }
-
-    /* Ultimate expander styling */
-    .stExpander {
-        background: rgba(26, 32, 44, 0.6) !important;
-        border: 2px solid rgba(255, 255, 255, 0.15) !important;
-        border-radius: 24px !important;
-        backdrop-filter: blur(40px) !important;
-        margin: 2rem 0 !important;
-        overflow: hidden !important;
-        box-shadow: 
-            0 20px 40px rgba(0, 0, 0, 0.3),
-            0 0 80px rgba(56, 189, 248, 0.1),
-            inset 0 2px 0 rgba(255, 255, 255, 0.15) !important;
-        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important;
-    }
     
-    .stExpander:hover {
-        transform: translateY(-4px) scale(1.01) !important;
-        box-shadow: 
-            0 30px 60px rgba(0, 0, 0, 0.4),
-            0 0 120px rgba(56, 189, 248, 0.2),
-            inset 0 2px 0 rgba(255, 255, 255, 0.2) !important;
-        border-color: rgba(56, 189, 248, 0.3) !important;
-    }
-    
-    .stExpander > div > div {
-        background: linear-gradient(135deg, rgba(56, 189, 248, 0.15) 0%, rgba(168, 85, 247, 0.15) 100%) !important;
-        border-bottom: 2px solid rgba(255, 255, 255, 0.15) !important;
-        border-radius: 24px 24px 0 0 !important;
-        color: rgba(255, 255, 255, 0.95) !important;
-        font-family: 'Inter', sans-serif !important;
-        font-weight: 700 !important;
-        letter-spacing: 0.05em !important;
-        padding: 2rem !important;
-        font-size: 1.2rem !important;
-        text-transform: uppercase;
-    }
-    /* Hide the "Collapse" text on the expander */
-    .stExpander > button > div:last-child {
-        display: none;
-    }
-    
-    .stExpanderDetails {
-        background: rgba(26, 32, 44, 0.4) !important;
-        border-radius: 0 0 24px 24px !important;
-        padding: 2.5rem !important;
-    }
-
     /* Ultimate input styling - MODIFIED */
     div[data-baseweb="input"] input,
     div[data-baseweb="select"] span,
@@ -208,8 +161,8 @@ st.markdown(
     [data-testid="stTextInput"] input,
     [data-testid="stSelectbox"] span,
     [data-testid="stTextarea"] textarea {
-        background: rgba(26, 32, 44, 0.8) !important;
-        color: #FBC02D !important; /* CHANGED TO YELLOW */
+        background: #1a1c29 !important; /* Navy Blue */
+        color: #FBC02D !important; /* Yellow */
         border: 2px solid rgba(255, 255, 255, 0.2) !important;
         border-radius: 16px !important;
         font-family: 'Inter', sans-serif !important;
@@ -240,7 +193,7 @@ st.markdown(
         transform: translateY(-2px) scale(1.01) !important;
         background: rgba(26, 32, 44, 0.9) !important;
     }
-
+    
     /* Ultimate title styling */
     h1, .stTitle {
         font-size: 5rem !important;
@@ -314,7 +267,7 @@ st.markdown(
             inset 0 2px 0 rgba(255, 255, 255, 0.2) !important;
         transform: translateY(-4px) scale(1.02) !important;
     }
-
+    
     /* Ultimate image styling */
     .stImage > img {
         border: 3px solid rgba(56, 189, 248, 0.4) !important;
@@ -375,8 +328,7 @@ st.markdown(
       opacity: 0.95 !important;
     }
     
-    /* === セレクトのドロップダウン（ポップオーバー）は body 直下に出るのでグローバル指定 === */
-    /* 背景をダーク、文字を白にして可読性を確保 */
+    /* === セレクトのドロップダウンパネル自体をダークに === */
     [data-baseweb="popover"],
     [role="listbox"],
     [data-baseweb="menu"] {
@@ -386,66 +338,57 @@ st.markdown(
       box-shadow: 0 30px 60px rgba(0,0,0,0.4) !important;
       z-index: 9999 !important;
     }
-    [data-baseweb="popover"] ul li,
-    [role="option"],
-    [data-baseweb="menu"] li {
+
+    /* === ★★★ここからが修正箇所★★★ === */
+    /* ④ 選択肢の通常時、ホバー／選択時 */
+    body [role="option"] {
       color: #ffffff !important;
-    }
-    [role="option"][aria-selected="true"],
-    [data-baseweb="menu"] li[aria-selected="true"],
-    [data-baseweb="menu"] li:hover {
-      background: linear-gradient(135deg, rgba(56,189,248,0.3), rgba(168,85,247,0.3)) !important;
-      color: #ffffff !important;
+      background-color: #0b0d15 !important; /* 選択肢の背景を紺色に */
+      transition: background 0.3s ease-in-out !important; /* なめらかな変化 */
     }
 
-    /* ① セレクトの「プレート」（閉じている時の白い板）を黒に */
+    body [role="option"][aria-selected="true"],
+    body [role="option"]:hover {
+       /* ホバー時の虹色アニメーション */
+      background: linear-gradient(270deg, red, orange, yellow, green, blue, indigo, violet) !important;
+      background-size: 400% 400% !important;
+      animation: rainbow 5s ease infinite !important;
+      color: white !important;
+    }
+
+    @keyframes rainbow {
+        0%{background-position:0% 50%}
+        50%{background-position:100% 50%}
+        100%{background-position:0% 50%}
+    }
+    /* === ★★★ここまでが修正箇所★★★ === */
+
+
+    /* ① セレクトの「プレート」（閉じている時の表示部分） */
     [data-testid="stSelectbox"] > div > div {
-      background: #0b0d15 !important;              /* 黒 */
+      background: #1a1c29 !important; 
       border: 2px solid rgba(255,255,255,0.2) !important;
       border-radius: 16px !important;
     }
 
-    /* ② ドロップダウンのパネル自体（開いた時の白い板）を黒に */
-    body > div[role="listbox"],
-    body > div[data-baseweb="popover"] {
-      background: #0b0d15 !important;              /* 黒 */
-      border: 2px solid rgba(255,255,255,0.2) !important;
-      border-radius: 20px !important;
-      box-shadow: 0 30px 60px rgba(0,0,0,0.4) !important;
-      z-index: 9999 !important;
-    }
-
-    /* ③ パネル内の要素で白背景が残る場合の保険（透明化） */
-    body > div[role="listbox"] * ,
-    body > div[data-baseweb="popover"] * {
-      background-color: transparent !important;
-    }
-
-    /* ④ 選択肢のホバー／選択時 */
-    body [role="option"] { color: #ffffff !important; }
-    body [role="option"][aria-selected="true"],
-    body [role="option"]:hover {
-      background: rgba(56,189,248,0.18) !important;
-    }
-
     /* ⑤ セレクトの値（閉じている時の表示行）も黒背景で統一 */
     div[data-baseweb="select"] > div[role="combobox"] {
-      background: #0b0d15 !important;
+      background: transparent !important;
     }
     </style>
     """,
     unsafe_allow_html=True
 )
 
-st.title("📸 バナー画像からコピー案を生成")
+st.title("✍️ バナーコピー生成")
 
 # ---------------------------
 # 1) 画像アップロード（任意）
 # ---------------------------
-uploaded_image = st.file_uploader("バナー画像をアップロード（任意）", type=["jpg", "png"])
+uploaded_image = st.file_uploader("参考にするバナー画像をアップロード（任意）", type=["jpg", "png"])
 if uploaded_image:
     image = Image.open(uploaded_image)
-    st.image(image, caption="アップロードされた画像", use_container_width=True)
+    st.image(image, caption="アップロードされた画像", width=300) # 小さめにプレビュー
 
 # ---------------------------
 # 2) 業種カテゴリ
@@ -515,6 +458,14 @@ with opt_cols[0]:
 with opt_cols[1]:
     include_urgency = st.checkbox("緊急性要素を含める（例：期間限定・先着・残りわずか）")
 
+# --- 追加機能 ---
+add_ctr = False
+check_typos = False
+if user_plan not in ["Free", "Guest"]:
+    with st.expander("高度な機能 (Lightプラン以上)"):
+        add_ctr = st.checkbox("予想CTRを追加")
+        check_typos = st.checkbox("誤字脱字をチェック")
+
 # 投稿文作成ブロック
 st.markdown("---")
 st.subheader("📝 投稿文作成（任意）")
@@ -547,6 +498,9 @@ def build_prompt():
     emoji_rule = "・各案に1〜2個の絵文字を自然に入れてください。" if include_emoji else "・絵文字は使用しないでください。"
     urgency_rule = "・必要に応じて『期間限定』『先着順』『残りわずか』などの緊急性フレーズも自然に織り交ぜてください。" if include_urgency else ""
     yakki_rule = "・薬機法/医療広告ガイドラインに抵触する表現は避けてください（例：治る、即効、永久、医療行為の示唆 など）。" if needs_yakkihou else ""
+    ctr_rule = "・各コピー案に対して、予想されるクリックスルー率（CTR）をパーセンテージで示してください。" if add_ctr else ""
+    typo_rule = "・提案する前に、全てのテキストに誤字脱字がないか厳密に確認してください。" if check_typos else ""
+    
     cap_rule = ""
     if enable_caption and caption_lines > 0:
         cap_rule = f"""
@@ -576,6 +530,8 @@ def build_prompt():
 {emoji_rule}
 {urgency_rule}
 {yakki_rule}
+{ctr_rule}
+{typo_rule}
 
 ### 生成対象
 {os.linesep.join(type_instructions) if type_instructions else '- （コピータイプなし）'}
@@ -590,11 +546,11 @@ def build_prompt():
 
 出力フォーマット例：
 ## キャッチコピー
-1. 〜
-2. 〜
+1. 〜 (予想CTR: X.X%)
+2. 〜 (予想CTR: Y.Y%)
 
 ## メインコピー
-1. 〜
+1. 〜 (予想CTR: Z.Z%)
 ...
 
 { '## 投稿文\n1)\n2)\n...' if enable_caption else '' }
@@ -607,7 +563,7 @@ if generate_btn:
     if user_plan in ["Free", "Guest"]:
         st.warning("この機能はFree/Guestプランではご利用いただけません。Light以上のプランでご利用ください。")
         st.stop()
-    # 残回数チェック
+    # ★★★ 残回数チェック（修正） ★★★
     if remaining_uses <= 0:
         st.warning(f"残り回数がありません。（現在プラン：{user_plan}）")
         st.info("利用回数を増やすには、プランのアップグレードが必要です。")
@@ -624,35 +580,32 @@ if generate_btn:
 
     with st.spinner("コピー案を生成中..."):
         try:
-            # OpenAI へ投げる
-            resp = client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {"role": "system", "content": "あなたは日本語に精通した広告コピーライターです。マーケ基礎と法規を理解し、簡潔で効果的な表現を作ります。"},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.9,
-            )
-            output = resp.choices[0].message.content.strip()
+            # ★★★ 利用回数を1消費（修正） ★★★
+            if auth_utils.update_user_uses_in_firestore(st.session_state["user"]):
+                # UI上の残回数も即座に反映
+                st.session_state.remaining_uses -= 1
 
-            # 表示
-            st.subheader("✍️ 生成結果")
-            st.markdown(output)
+                # OpenAI へ投げる
+                resp = client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=[
+                        {"role": "system", "content": "あなたは日本語に精通した広告コピーライターです。マーケ基礎と法規を理解し、簡潔で効果的な表現を作ります。"},
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=0.9,
+                )
+                output = resp.choices[0].message.content.strip()
 
-            if needs_yakkihou:
-                st.subheader("🔍 薬機法メモ")
-                st.info("※ このカテゴリでは『治る／即効／永久／医療行為の示唆』などはNG。効能・効果の断定表現も避けましょう。")
+                # 表示
+                st.subheader("✍️ 生成結果")
+                st.markdown(output)
 
-            # 使⽤回数の消費（失敗してもアプリが落ちないよう try）
-            try:
-                if auth_utils.update_user_uses_in_firestore_rest(
-                    st.session_state.get("user"),
-                    st.session_state.get("id_token")
-                ):
-                    # UI上の残回数を1減らす
-                    st.session_state["remaining_uses"] = max(0, remaining_uses - 1)
-            except Exception:
-                pass
+                if needs_yakkihou:
+                    st.subheader("🔍 薬機法メモ")
+                    st.info("※ このカテゴリでは『治る／即効／永久／医療行為の示唆』などはNG。効能・効果の断定表現も避けましょう。")
+            else:
+                st.error("利用回数の更新に失敗しました。")
+
 
         except Exception as e:
             st.error(f"コピー生成中にエラーが発生しました：{e}")
