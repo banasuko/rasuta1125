@@ -359,7 +359,7 @@ st.markdown(
       opacity: 0.95 !important;
     }
     
-    /* === セレクトのドロップダウン（ポップオーバー）は body 直下に出るのでグローバル指定 === */
+    /* === セレクトのドロップダウンパネル自体をダークに === */
     [data-baseweb="popover"],
     [role="listbox"],
     [data-baseweb="menu"] {
@@ -369,51 +369,42 @@ st.markdown(
       box-shadow: 0 30px 60px rgba(0,0,0,0.4) !important;
       z-index: 9999 !important;
     }
-    [data-baseweb="popover"] ul li,
-    [role="option"],
-    [data-baseweb="menu"] li {
+
+    /* === ★★★ここからが修正箇所★★★ === */
+    /* ④ 選択肢の通常時、ホバー／選択時 */
+    body [role="option"] {
       color: #ffffff !important;
-    }
-    [role="option"][aria-selected="true"],
-    [data-baseweb="menu"] li[aria-selected="true"],
-    [data-baseweb="menu"] li:hover {
-      background: linear-gradient(135deg, rgba(56,189,248,0.3), rgba(168,85,247,0.3)) !important;
-      color: #ffffff !important;
+      background-color: #0b0d15 !important; /* 選択肢の背景を紺色に */
+      transition: background 0.3s ease-in-out !important; /* なめらかな変化 */
     }
 
-    /* ① セレクトの「プレート」（閉じている時の白い板）を黒に */
+    body [role="option"][aria-selected="true"],
+    body [role="option"]:hover {
+       /* ホバー時の虹色アニメーション */
+      background: linear-gradient(270deg, red, orange, yellow, green, blue, indigo, violet) !important;
+      background-size: 400% 400% !important;
+      animation: rainbow 5s ease infinite !important;
+      color: white !important;
+    }
+
+    @keyframes rainbow {
+        0%{background-position:0% 50%}
+        50%{background-position:100% 50%}
+        100%{background-position:0% 50%}
+    }
+    /* === ★★★ここまでが修正箇所★★★ === */
+
+
+    /* ① セレクトの「プレート」（閉じている時の表示部分） */
     [data-testid="stSelectbox"] > div > div {
-      background: #1a1c29 !important; /* Navy Blue */
+      background: #1a1c29 !important; 
       border: 2px solid rgba(255,255,255,0.2) !important;
       border-radius: 16px !important;
     }
 
-    /* ② ドロップダウンのパネル自体（開いた時の白い板）を黒に */
-    body > div[role="listbox"],
-    body > div[data-baseweb="popover"] {
-      background: #0b0d15 !important;              /* 黒 */
-      border: 2px solid rgba(255,255,255,0.2) !important;
-      border-radius: 20px !important;
-      box-shadow: 0 30px 60px rgba(0,0,0,0.4) !important;
-      z-index: 9999 !important;
-    }
-
-    /* ③ パネル内の要素で白背景が残る場合の保険（透明化） */
-    body > div[role="listbox"] * ,
-    body > div[data-baseweb="popover"] * {
-      background-color: transparent !important;
-    }
-
-    /* ④ 選択肢のホバー／選択時 */
-    body [role="option"] { color: #ffffff !important; }
-    body [role="option"][aria-selected="true"],
-    body [role="option"]:hover {
-      background: rgba(56,189,248,0.18) !important;
-    }
-
     /* ⑤ セレクトの値（閉じている時の表示行）も黒背景で統一 */
     div[data-baseweb="select"] > div[role="combobox"] {
-      background: #0b0d15 !important;
+      background: transparent !important;
     }
     </style>
     """,
@@ -498,6 +489,14 @@ with opt_cols[0]:
 with opt_cols[1]:
     include_urgency = st.checkbox("緊急性要素を含める（例：期間限定・先着・残りわずか）")
 
+# --- 追加機能 ---
+add_ctr = False
+check_typos = False
+if user_plan not in ["Free", "Guest"]:
+    with st.expander("高度な機能 (Lightプラン以上)"):
+        add_ctr = st.checkbox("予想CTRを追加")
+        check_typos = st.checkbox("誤字脱字をチェック")
+
 # 投稿文作成ブロック
 st.markdown("---")
 st.subheader("📝 投稿文作成（任意）")
@@ -530,6 +529,8 @@ def build_prompt():
     emoji_rule = "・各案に1〜2個の絵文字を自然に入れてください。" if include_emoji else "・絵文字は使用しないでください。"
     urgency_rule = "・必要に応じて『期間限定』『先着順』『残りわずか』などの緊急性フレーズも自然に織り交ぜてください。" if include_urgency else ""
     yakki_rule = "・薬機法/医療広告ガイドラインに抵触する表現は避けてください（例：治る、即効、永久、医療行為の示唆 など）。" if needs_yakkihou else ""
+    ctr_rule = "・各コピー案に対して、予想されるクリックスルー率（CTR）をパーセンテージで示してください。" if add_ctr else ""
+    typo_rule = "・提案する前に、全てのテキストに誤字脱字がないか厳密に確認してください。" if check_typos else ""
     cap_rule = ""
     if enable_caption and caption_lines > 0:
         cap_rule = f"""
@@ -559,6 +560,8 @@ def build_prompt():
 {emoji_rule}
 {urgency_rule}
 {yakki_rule}
+{ctr_rule}
+{typo_rule}
 
 ### 生成対象
 {os.linesep.join(type_instructions) if type_instructions else '- （コピータイプなし）'}
@@ -573,11 +576,11 @@ def build_prompt():
 
 出力フォーマット例：
 ## キャッチコピー
-1. 〜
-2. 〜
+1. 〜 (予想CTR: X.X%)
+2. 〜 (予想CTR: Y.Y%)
 
 ## メインコピー
-1. 〜
+1. 〜 (予想CTR: Z.Z%)
 ...
 
 { '## 投稿文\n1)\n2)\n...' if enable_caption else '' }
