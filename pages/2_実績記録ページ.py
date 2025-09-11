@@ -1,144 +1,170 @@
 import streamlit as st
-import base64
-import io
-import os
-import re
-import requests
-from PIL import Image
+import pandas as pd
+from fpdf import FPDF
 from datetime import datetime
-from openai import OpenAI
+import auth_utils # 認証モジュールをインポート
 
-import auth_utils # Import Firebase authentication
+# --- PDF生成用の日本語フォントファイルへのパス ---
+# "NotoSansJP-Regular.ttf"がプロジェクトのルートにあることを想定
+FONT_PATH = "NotoSansJP-Regular.ttf" 
+
+class PDF(FPDF):
+    def header(self):
+        try:
+            self.add_font('NotoSansJP', '', FONT_PATH, uni=True)
+            self.set_font('NotoSansJP', '', 12)
+        except RuntimeError:
+            self.set_font('Arial', 'B', 12)
+            # フォントファイルが見つからない場合、Streamlit上で警告を一度だけ表示
+            if 'font_warning_shown' not in st.session_state:
+                st.warning(f"日本語フォントファイル '{FONT_PATH}' が見つかりません。PDFの日本語が文字化けする可能性があります。")
+                st.session_state.font_warning_shown = True
+
+        self.cell(0, 10, '広告実績レポート', 0, 1, 'C')
+        self.ln(10)
+
+    def footer(self):
+        self.set_y(-15)
+        try:
+            self.set_font('NotoSansJP', '', 8)
+        except RuntimeError:
+            self.set_font('Arial', 'I', 8)
+        self.cell(0, 10, f'Page {self.page_no()}', 0, 0, 'C')
+
+    def table_header(self, header, col_widths):
+        try:
+            self.set_font('NotoSansJP', '', 8)
+        except RuntimeError:
+            self.set_font('Arial', 'B', 8)
+        
+        self.set_fill_color(230, 230, 230)
+        for i, col_name in enumerate(header):
+            self.cell(col_widths[i], 7, col_name, 1, 0, 'C', 1)
+        self.ln()
+
+    def table_body(self, data, col_widths):
+        try:
+            self.set_font('NotoSansJP', '', 8)
+        except RuntimeError:
+            self.set_font('Arial', '', 8)
+
+        for row in data:
+            # MultiCellを使って自動で高さ調整
+            x_before = self.get_x()
+            y_before = self.get_y()
+            max_y = y_before
+
+            for i, item in enumerate(row):
+                width = col_widths[i]
+                self.multi_cell(width, 5, str(item), border=0, align='L')
+                if self.get_y() > max_y:
+                    max_y = self.get_y()
+                self.set_xy(x_before + sum(col_widths[:i+1]), y_before)
+            
+            self.set_xy(x_before, y_before) # X座標をリセット
+            
+            # 各セルの枠線を描画
+            for i, item in enumerate(row):
+                self.rect(self.get_x(), self.get_y(), col_widths[i], max_y - y_before)
+                self.set_x(self.get_x() + col_widths[i])
+
+            self.ln(max_y - y_before)
 
 
-# Google Apps Script (GAS) and Google Drive information (GAS for legacy spreadsheet, will be removed later if not needed)
-GAS_URL = "https://script.google.com/macros/s/AKfycby_uD6Jtb9GT0-atbyPKOPc8uyVKodwYVIQ2Tpe-_E8uTOPiir0Ce1NAPZDEOlCUxN4/exec" # Update this URL to your latest GAS deployment URL
+# Streamlitページの基本設定
+st.set_page_config(page_title="実績記録", layout="wide")
 
-
-# Helper function to sanitize values
-def sanitize(value):
-    """Replaces None or specific strings with 'エラー' (Error)"""
-    if value is None or value == "取得できず":
-        return "エラー"
-    return value
-
-
-# Streamlit UI configuration
-st.set_page_config(layout="wide", page_title="バナスコAI")
-
-# --- Logo Display ---
-logo_path = "banasuko_logo_icon.png"
-
-try:
-    logo_image = Image.open(logo_path)
-    st.sidebar.image(logo_image, use_container_width=True) # Display logo in sidebar, adjusting to column width
-except FileNotFoundError:
-    st.sidebar.error(f"ロゴ画像 '{logo_path}' が見つかりません。ファイルが正しく配置されているか確認してください。")
-
-# --- Login Check ---
-# This is crucial! Code below this line will only execute if the user is logged in.
+# --- ログイン & プランチェック ---
 auth_utils.check_login()
+user_plan = st.session_state.get("plan", "Guest")
 
-# --- OpenAI Client Initialization ---
-# Initialize OpenAI client after login check, when OpenAI API key is available from environment variables
-openai_api_key = os.getenv("OPENAI_API_KEY")
-if openai_api_key:
-    client = OpenAI(api_key=openai_api_key)
+# ★★★ Lightプラン以上でない場合はアクセス制限 ★★★
+if user_plan in ["Free", "Guest"]:
+    st.warning("このページはLightプラン以上の限定機能です。")
+    st.info("実績記録を管理するには、プランのアップグレードが必要です。")
+    st.stop()
+
+st.title("📋 バナスコ｜広告実績記録ページ")
+st.markdown("AIによる採点結果が自動で記録されます。実際の広告費やCTRなどの成果は、後からこの表で直接編集・追記してください。")
+
+# --- Firestoreからデータを取得 ---
+uid = st.session_state.user
+
+# セッションステートにデータがなければFirestoreから読み込む
+records_data = auth_utils.get_diagnosis_records_from_firestore(uid)
+if records_data:
+    records_df = pd.DataFrame(records_data)
 else:
-    # For demo purposes without API key
-    client = None
-    st.warning("デモモード - OpenAI APIが設定されていません")
+    records_df = pd.DataFrame() # 空で初期化
 
+# ★★★ 表示・編集する列を定義（新しい項目を追加） ★★★
+display_cols = [
+    "user_name", "banner_name", "platform", "category", "score", "predicted_ctr",
+    "ad_cost", "impressions", "clicks", "actual_ctr", "actual_cvr", "notes"
+]
+# DataFrameに列が存在しない場合は作成
+for col in display_cols:
+    if col not in records_df.columns:
+        records_df[col] = ""
 
-# --- Ultimate Professional CSS Theme ---
-st.markdown(
-    """
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@300;400;500;600;700&display=swap');
-    
-    /* Professional dark gradient background */
-    .stApp {
-        background: linear-gradient(135deg, #0f0f1a 0%, #1a1c29 15%, #2d3748 35%, #1a202c 50%, #2d3748 65%, #4a5568 85%, #2d3748 100%) !important;
-        background-attachment: fixed;
-        background-size: 400% 400%;
-        animation: background-flow 15s ease-in-out infinite;
-    }
-    
-    @keyframes background-flow {
-        0%, 100% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
-    }
-    
-    body {
-        background: transparent !important;
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
-    }
+# --- データエディタで表を表示・編集 ---
+edited_df = st.data_editor(
+    records_df[display_cols],
+    column_config={
+        "user_name": "ユーザー名",
+        "banner_name": "バナー名",
+        "platform": "媒体",
+        "category": "カテゴリ",
+        "score": "AIスコア",
+        "predicted_ctr": "AI予測CTR",
+        "ad_cost": st.column_config.NumberColumn("広告費 (円)", format="¥%d"),
+        "impressions": st.column_config.NumberColumn("Impression数"),
+        "clicks": st.column_config.NumberColumn("クリック数"),
+        "actual_ctr": st.column_config.NumberColumn("実CTR (%)", format="%.2f%%"),
+        "actual_cvr": st.column_config.NumberColumn("実CVR (%)", format="%.2f%%"),
+        "notes": "メモ"
+    },
+    num_rows="dynamic",
+    height=500,
+    use_container_width=True,
+    key="data_editor"
+)
 
-    /* Professional main container with glassmorphism */
-    .main .block-container {
-        background: rgba(26, 32, 44, 0.4) !important;
-        backdrop-filter: blur(60px) !important;
-        border: 2px solid rgba(255, 255, 255, 0.1) !important;
-        border-radius: 32px !important;
-        box-shadow: 
-            0 50px 100px -20px rgba(0, 0, 0, 0.6),
-            0 0 0 1px rgba(255, 255, 255, 0.05),
-            inset 0 2px 0 rgba(255, 255, 255, 0.15) !important;
-        padding: 5rem 4rem !important;
-        position: relative !important;
-        margin: 2rem auto !important;
-        max-width: 1400px !important;
-        min-height: 95vh !important;
-    }
-    
-    .main .block-container::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: linear-gradient(135deg, 
-            rgba(56, 189, 248, 0.04) 0%, 
-            rgba(147, 51, 234, 0.04) 25%, 
-            rgba(59, 130, 246, 0.04) 50%, 
-            rgba(168, 85, 247, 0.04) 75%, 
-            rgba(56, 189, 248, 0.04) 100%);
-        border-radius: 32px;
-        pointer-events: none;
-        z-index: -1;
-        animation: container-glow 8s ease-in-out infinite alternate;
-    }
-    
-    @keyframes container-glow {
-        from { opacity: 0.3; }
-        to { opacity: 0.7; }
-    }
+# --- 保存ボタンとPDFエクスポートボタン ---
+col1, col2, _ = st.columns([1, 1, 2])
+with col1:
+    if st.button("💾 編集内容を保存", type="primary"):
+        with st.spinner("保存中..."):
+            try:
+                if auth_utils.save_diagnosis_records_to_firestore(uid, edited_df):
+                    st.success("実績を保存しました！")
+                else:
+                    st.error("保存に失敗しました。")
+            except Exception as e:
+                st.error(f"保存中にエラーが発生しました: {e}")
 
-    /* Professional sidebar */
-    .stSidebar {
-        background: linear-gradient(180deg, rgba(15, 15, 26, 0.98) 0%, rgba(26, 32, 44, 0.98) 100%) !important;
-        backdrop-filter: blur(40px) !important;
-        border-right: 2px solid rgba(255, 255, 255, 0.1) !important;
-        box-shadow: 8px 0 50px rgba(0, 0, 0, 0.5) !important;
-    }
-    
-    .stSidebar > div:first-child {
-        background: transparent !important;
-    }
-    
-    /* Ultimate gradient button styling */
-    .stButton > button {
-        background: linear-gradient(135deg, #38bdf8 0%, #a855f7 50%, #06d6a0 100%) !important;
-        color: #ffffff !important;
-        border: none !important;
-        border-radius: 60px !important;
-        font-family: 'Inter', sans-serif !important;
-        font-weight: 700 !important;
-        font-size: 1.1rem !important;
-        padding: 1.25rem 3rem !important;
-        letter-spacing: 0.05em !important;
-        box-shadow: 
-            0 15px 35px rgba(56, 189, 248, 0.4),
-            0 8px 20px rgba(168, 85, 247, 0.3),
-            0 0 60px rgba(6, 214, 160,
+with col2:
+    # --- PDFエクスポート機能 ---
+    df_for_pdf = edited_df.fillna('') # NaNを空白に変換
+    if not df_for_pdf.empty:
+        pdf = PDF(orientation='L', unit='mm', format='A4') # 横向き
+        pdf.add_page()
+        pdf.chapter_title(f"ユーザー: {st.session_state.email} の広告実績")
+
+        header = [
+            "ユーザー名", "バナー名", "媒体", "カテゴリ", "スコア", "予測CTR",
+            "広告費", "Imp", "Clicks", "実CTR", "実CVR", "メモ"
+        ]
+        col_widths = [20, 30, 15, 15, 12, 18, 20, 20, 20, 15, 15, 70] # 列幅の合計がA4横(297mm)-マージン程度になるように調整
+        
+        pdf.table_header(header, col_widths)
+        pdf.table_body(df_for_pdf[display_cols].values.tolist(), col_widths)
+
+        pdf_bytes = pdf.output(dest='S').encode('latin1')
+
+        st.download_button(
+            label="📄 PDFでエクスポート",
+            data=pdf_bytes,
+            file_name=f"banasuko_report_{datetime.now().strftime('%Y%m%d')}.pdf",
+            mime="application/pdf",
+        )
