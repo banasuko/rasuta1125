@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 import firebase_admin
 from firebase_admin import credentials, firestore, storage
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 # .envファイルから環境変数を読み込む
 load_dotenv()
@@ -36,39 +36,30 @@ if missing_vars:
     st.stop()
 
 # --- Firebase Admin SDKの初期化 ---
-# アプリのセッション中で一度だけ実行されるように制御
 try:
     if not firebase_admin._apps:
-        # private_keyの改行コードを正しく処理
         admin_private_key = ADMIN_PRIVATE_KEY_RAW.replace('\\n', '\n')
-
-        # サービスアカウント情報（辞書形式で構築）
         service_account_info = {
             "type": "service_account",
             "project_id": ADMIN_PROJECT_ID,
-            "private_key_id": os.getenv("FIREBASE_PRIVATE_KEY_ID_ADMIN", ""), # オプション
+            "private_key_id": os.getenv("FIREBASE_PRIVATE_KEY_ID_ADMIN", ""),
             "private_key": admin_private_key,
             "client_email": ADMIN_CLIENT_EMAIL,
-            "client_id": os.getenv("FIREBASE_CLIENT_ID_ADMIN", ""), # オプション
+            "client_id": os.getenv("FIREBASE_CLIENT_ID_ADMIN", ""),
             "auth_uri": "https://accounts.google.com/o/oauth2/auth",
             "token_uri": "https://oauth2.googleapis.com/token",
             "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
             "client_x509_cert_url": f"https://www.googleapis.com/robot/v1/metadata/x509/{ADMIN_CLIENT_EMAIL.replace('@', '%40')}",
         }
-
         cred = credentials.Certificate(service_account_info)
         firebase_admin.initialize_app(cred, {'storageBucket': STORAGE_BUCKET})
-
-    # 初期化が成功したら、Firestoreクライアントを取得
     db = firestore.client()
-
 except Exception as e:
     st.error(f"❌ Firebase Admin SDKの初期化に失敗しました。サービスアカウントキーを確認してください。")
     st.error(f"エラー詳細: {e}")
     st.stop()
 
 # --- Streamlitのセッションステート初期化 ---
-# 初回ロード時のみ実行
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.user = None
@@ -81,7 +72,6 @@ if "logged_in" not in st.session_state:
 FIREBASE_AUTH_BASE_URL = "https://identitytoolkit.googleapis.com/v1/accounts:"
 
 def sign_in_with_email_and_password(email, password):
-    """Firebase REST API を使ってメールとパスワードでサインインする"""
     url = f"{FIREBASE_AUTH_BASE_URL}signInWithPassword?key={FIREBASE_API_KEY}"
     data = {"email": email, "password": password, "returnSecureToken": True}
     response = requests.post(url, json=data)
@@ -89,7 +79,6 @@ def sign_in_with_email_and_password(email, password):
     return response.json()
 
 def create_user_with_email_and_password(email, password):
-    """Firebase REST API を使ってメールとパスワードでユーザーを作成する"""
     url = f"{FIREBASE_AUTH_BASE_URL}signUp?key={FIREBASE_API_KEY}"
     data = {"email": email, "password": password, "returnSecureToken": True}
     response = requests.post(url, json=data)
@@ -98,12 +87,36 @@ def create_user_with_email_and_password(email, password):
 
 # --- Firestoreの操作関数 ---
 def get_user_data_from_firestore(uid):
-    """Firestoreからユーザーのプランと利用回数を取得する"""
     global db
     doc_ref = db.collection('users').document(uid)
     doc = doc_ref.get()
+    
     if doc.exists:
         data = doc.to_dict()
+        now = datetime.now(timezone.utc)
+        last_reset_str = data.get("last_reset")
+        needs_reset = False
+        if last_reset_str:
+            last_reset = datetime.fromisoformat(last_reset_str.replace('Z', '+00:00'))
+            if last_reset.year < now.year or last_reset.month < now.month:
+                needs_reset = True
+        else:
+            needs_reset = True
+            
+        if needs_reset:
+            plan = data.get("plan", "Free")
+            plan_monthly_uses = {
+                "Free": 5, "Guest": 0, "Light": 50, "Pro": 200, "Team": 500, "Enterprise": 1000
+            }
+            new_remaining_uses = plan_monthly_uses.get(plan, 0)
+            
+            doc_ref.update({
+                "remaining_uses": new_remaining_uses,
+                "last_reset": now.isoformat()
+            })
+            data["remaining_uses"] = new_remaining_uses
+            st.toast(f"利用回数がリセットされました。今月の残回数: {new_remaining_uses}回")
+
         st.session_state.plan = data.get("plan", "Free")
         st.session_state.remaining_uses = data.get("remaining_uses", 0)
     else:
@@ -113,12 +126,12 @@ def get_user_data_from_firestore(uid):
             "email": st.session_state.email,
             "plan": st.session_state.plan,
             "remaining_uses": st.session_state.remaining_uses,
-            "created_at": firestore.SERVER_TIMESTAMP
+            "created_at": firestore.SERVER_TIMESTAMP,
+            "last_reset": datetime.now(timezone.utc).isoformat()
         })
     return True
 
 def update_user_uses_in_firestore(uid, uses_to_deduct=1):
-    """Firestoreのユーザー利用回数を減らす"""
     global db
     doc_ref = db.collection('users').document(uid)
     try:
@@ -126,15 +139,14 @@ def update_user_uses_in_firestore(uid, uses_to_deduct=1):
             "remaining_uses": firestore.Increment(-uses_to_deduct),
             "last_used_at": firestore.SERVER_TIMESTAMP
         })
-        st.session_state.remaining_uses -= uses_to_deduct
         return True
     except Exception as e:
         st.error(f"利用回数の更新に失敗しました: {e}")
         return False
 
 def add_diagnosis_record_to_firestore(uid, record_data):
-    """ユーザーの診断記録をFirestoreのdiagnosesサブコレクションに追加する"""
     global db
+    # diagnosesサブコレクションにドキュメントを追加
     doc_ref = db.collection('users').document(uid).collection('diagnoses').document()
     try:
         record_data["created_at"] = firestore.SERVER_TIMESTAMP
@@ -144,9 +156,39 @@ def add_diagnosis_record_to_firestore(uid, record_data):
         st.error(f"診断記録のFirestore保存に失敗しました: {e}")
         return False
 
-# --- Firebase Storageの操作関数 ---
+# ★★★★★ ここからが追加された関数 ★★★★★
+def get_diagnosis_records_from_firestore(uid):
+    """Firestoreから特定ユーザーの実績記録をすべて取得する"""
+    global db
+    records = []
+    docs = db.collection('users').document(uid).collection('diagnoses').order_by("created_at", direction=firestore.Query.DESCENDING).stream()
+    for doc in docs:
+        record = doc.to_dict()
+        record["id"] = doc.id # ドキュメントIDも追加
+        records.append(record)
+    return records
+
+def save_diagnosis_records_to_firestore(uid, records_df):
+    """DataFrameの内容でFirestoreの実績記録を上書き保存する"""
+    global db
+    user_diagnoses_ref = db.collection('users').document(uid).collection('diagnoses')
+
+    # 現在のコレクション内のドキュメントをすべて削除（より安全な方法としてバッチ処理を推奨）
+    for doc in user_diagnoses_ref.stream():
+        doc.reference.delete()
+
+    # DataFrameの各行を新しいドキュメントとして追加
+    for _, row in records_df.iterrows():
+        record_data = row.to_dict()
+        # 'id'列はFirestoreに不要なので削除
+        if 'id' in record_data:
+            del record_data['id']
+        record_data["created_at"] = firestore.SERVER_TIMESTAMP
+        user_diagnoses_ref.add(record_data)
+    return True
+# ★★★★★ ここまでが追加された関数 ★★★★★
+
 def upload_image_to_firebase_storage(uid, image_bytes_io, filename):
-    """画像をFirebase Storageにアップロードし、公開URLを返す"""
     try:
         bucket = storage.bucket()
         blob = bucket.blob(f"users/{uid}/diagnoses_images/{filename}")
@@ -160,7 +202,6 @@ def upload_image_to_firebase_storage(uid, image_bytes_io, filename):
 
 # --- StreamlitのUI表示と認証フロー ---
 def login_page():
-    """Streamlit上にログイン画面を表示する関数"""
     st.title("🔐 バナスコAI ログイン")
     st.markdown("機能を利用するにはログインが必要です。")
 
@@ -180,7 +221,7 @@ def login_page():
                     get_user_data_from_firestore(user_info["localId"])
                     st.success(f"ログインしました: {user_info['email']}")
                     st.rerun()
-                except requests.exceptions.HTTPError as e:
+                except requests.exceptions.HTTPError:
                     st.error("ログインに失敗しました。メールアドレスまたはパスワードが間違っています。")
                 except Exception as e:
                     st.error(f"予期せぬエラーが発生しました: {e}")
@@ -209,18 +250,12 @@ def login_page():
                     st.error(f"予期せぬエラーが発生しました: {e}")
 
 def logout():
-    """ユーザーをログアウトさせ、セッションステートをクリアする関数"""
-    # 辞書を変更しながらイテレートしないようにキーのリストをコピー
     for key in list(st.session_state.keys()):
         del st.session_state[key]
     st.success("ログアウトしました。")
     st.rerun()
 
 def check_login():
-    """
-    ユーザーのログイン状態をチェックし、未ログインならログインページを表示。
-    ログイン済みならサイドバーに情報を表示。
-    """
     if not st.session_state.get("logged_in"):
         login_page()
         st.stop()
