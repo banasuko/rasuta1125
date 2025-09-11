@@ -2,5 +2,6 @@ streamlit
 pillow
 requests
 openai
-firebase-admin # ✅ Firestore/Admin SDK再統合のため追加
+firebase-admin
 python-dotenv
+fpdf2
