@@ -370,7 +370,6 @@ st.markdown(
       z-index: 9999 !important;
     }
 
-    /* === ★★★ここからが修正箇所★★★ === */
     /* ④ 選択肢の通常時、ホバー／選択時 */
     body [role="option"] {
       color: #ffffff !important;
@@ -392,8 +391,6 @@ st.markdown(
         50%{background-position:100% 50%}
         100%{background-position:0% 50%}
     }
-    /* === ★★★ここまでが修正箇所★★★ === */
-
 
     /* ① セレクトの「プレート」（閉じている時の表示部分） */
     [data-testid="stSelectbox"] > div > div {
@@ -411,232 +408,354 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# --- Clean Professional Header ---
-st.markdown('<div class="main-header">', unsafe_allow_html=True)
+st.title("バナー広告をAIで診断！")
+st.subheader("診断したいバナーの情報を入力してください")
 
-# Use standard Streamlit components instead of complex HTML
-st.markdown("# バナスコAI")
-st.markdown("## AI広告診断システム")
-st.markdown("### もう、無駄打ちしない。広告を\"武器\"に変えるプロフェッショナルAIツール")
+# Streamlitのセッションステートからユーザー情報を取得
+user_email = st.session_state.email
+user_uid = st.session_state.user
+user_plan = st.session_state.plan
+remaining_uses = st.session_state.remaining_uses
 
+# --- 診断機能 ---
 st.markdown("---")
+uploaded_file = st.file_uploader("診断したいバナー画像をアップロードしてください", type=["jpg", "png"])
 
-# Add professional badge
-st.markdown("""
-<div style="text-align: center; margin: 2rem 0;">
-    <span style="background: linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(168, 85, 247, 0.2)); 
-                   padding: 1rem 2rem; 
-                   border-radius: 50px; 
-                   border: 1px solid rgba(255, 255, 255, 0.2); 
-                   color: rgba(255, 255, 255, 0.9);
-                   font-weight: 600;
-                   letter-spacing: 0.1em;">
-        Professional Banner Analysis Platform
-    </span>
-</div>
-""", unsafe_allow_html=True)
+if uploaded_file is not None:
+    st.image(uploaded_file, caption="アップロードされたバナー", use_column_width=True)
 
-st.markdown('</div>', unsafe_allow_html=True)
+    # Convert uploaded file to bytes for OpenAI Vision API and Firebase Storage
+    image_bytes = uploaded_file.getvalue()
+    base64_image = base64.b64encode(image_bytes).decode('utf-8')
+    image_mime_type = uploaded_file.type
 
-# --- プランと残回数の取得 ---
-user_plan = st.session_state.get("plan", "Guest")
-remaining_uses = st.session_state.get("remaining_uses", 0)
+    # Store image in session state for later use
+    st.session_state.uploaded_image_bytes = image_bytes
+    st.session_state.uploaded_image_filename = uploaded_file.name
+    st.session_state.image_mime_type = image_mime_type
 
-# --- Ultimate Main Content Layout ---
-col1, col2 = st.columns([3, 2], gap="large")
+    with st.form("diagnosis_form"):
+        st.subheader("バナーの情報を入力")
+        banner_name = st.text_input("バナーの名前（例：初回限定キャンペーンバナー）", value=st.session_state.get('banner_name', ''))
+        platform = st.selectbox("掲載媒体", ["Google広告", "Yahoo!広告", "Facebook広告", "Instagram広告", "TikTok広告", "その他"], index=0 if "Google広告" else None)
+        category = st.selectbox("業種カテゴリ", ["美容室", "脱毛サロン", "エステ", "ネイル・まつげ", "ホワイトニング", "整体・接骨院", "学習塾", "子ども写真館", "飲食店", "その他"])
+        target_audience = st.text_input("ターゲット層（例：30代女性、ビジネスマン、子育て中のママなど）", value=st.session_state.get('target_audience', ''))
+        product_features = st.text_area("商品・サービスの特徴やメリット（箇条書きOK）", value=st.session_state.get('product_features', ''))
+        ad_goal = st.selectbox("広告の目的", ["認知拡大", "資料請求", "来店促進", "会員登録", "商品購入", "ブランディング", "その他"])
 
-with col1:
-    # Clean Form Header
-    st.subheader("📝 バナー診断フォーム")
+        # Lightプラン以上で利用可能な追加オプション
+        add_ctr = False
+        check_typos = False
+        if user_plan in ["Light", "Pro", "Team", "Enterprise"]:
+            st.markdown("---")
+            st.markdown("### ⚙️ 高度な機能 (Lightプラン以上)")
+            col_opt1, col_opt2 = st.columns(2)
+            with col_opt1:
+                add_ctr = st.checkbox("予想CTRを追加", help="AIがバナーの予想クリック率を算出します。")
+            with col_opt2:
+                check_typos = st.checkbox("改善コメントの誤字脱字をチェック", help="AIが生成する改善コメントの質が向上します。")
+        else:
+            st.markdown("---")
+            st.markdown("### ⚙️ 高度な機能 (Lightプラン以上)")
+            st.info("「予想CTR」や「改善コメントの誤字脱字チェック」はLightプラン以上でご利用いただけます。")
 
-    st.markdown("### 基本情報")
-    with st.container():
-        user_name = st.text_input("ユーザー名", key="user_name")
-        age_group = st.selectbox(
-            "ターゲット年代",
-            ["指定なし", "10代", "20代", "30代", "40代", "50代", "60代以上"],
-            key="age_group"
-        )
-        platform = st.selectbox("媒体", ["Instagram", "GDN", "YDN"], key="platform")
-        category = st.selectbox("カテゴリ", ["広告", "投稿"] if platform == "Instagram" else ["広告"], key="category")
-        has_ad_budget = st.selectbox("広告予算", ["あり", "なし"], key="has_ad_budget")
-        
-        purpose = st.selectbox(
-            "目的",
-            ["プロフィール誘導", "リンククリック", "保存数増加", "インプレッション増加"],
-            key="purpose"
-        )
 
-    st.markdown("### 詳細設定")
-    with st.container():
-        industry = st.selectbox("業種", ["美容", "飲食", "不動産", "子ども写真館", "その他"], key="industry")
-        genre = st.selectbox("ジャンル", ["お客様の声", "商品紹介", "ノウハウ", "世界観", "キャンペーン"], key="genre")
-        score_format = st.radio("スコア形式", ["A/B/C", "100点満点"], horizontal=True, key="score_format")
-        ab_pattern = st.radio("ABテストパターン", ["Aパターン", "Bパターン", "該当なし"], horizontal=True, key="ab_pattern")
-        banner_name = st.text_input("バナー名", key="banner_name")
+        submitted = st.form_submit_button("🚀 バナーをAI診断！")
 
-    # --- 追加機能 ---
-    add_ctr = False
-    check_typos = False
-    if user_plan not in ["Free", "Guest"]:
-        with st.expander("高度な機能 (Lightプラン以上)"):
-            add_ctr = st.checkbox("予想CTRを追加")
-            check_typos = st.checkbox("改善コメントの誤字脱字をチェック")
+        if submitted:
+            if client is None:
+                st.error("OpenAI APIキーが設定されていないため、診断を実行できません。")
+                st.stop()
+            
+            # --- 実行回数チェック ---
+            if remaining_uses <= 0:
+                st.warning(f"今月の利用回数を使い切りました。（現在プラン：{user_plan}）")
+                st.info("利用回数は毎月1日にリセットされます。または、プランのアップグレードをご検討ください。")
+                st.stop()
 
-    st.markdown("### 任意項目")
-    with st.container():
-        result_input = st.text_input("AI評価結果（任意）", help="AIが生成した評価結果を記録したい場合に入力します。", key="result_input")
-        follower_gain_input = st.text_input("フォロワー増加数（任意）", help="Instagramなどのフォロワー増加数があれば入力します。", key="follower_gain")
-        memo_input = st.text_area("メモ（任意）", help="その他、特記事項があれば入力してください。", key="memo_input")
+            if not all([banner_name, platform, category, target_audience, product_features, ad_goal]):
+                st.error("全ての項目を入力してください。")
+                st.stop()
 
-    # Clean Upload Header
-    st.subheader("📸 画像アップロード・AI診断")
-    st.markdown("---")
+            with st.spinner("AIがバナーを診断中..."):
+                try:
+                    # プロンプトの生成
+                    prompt_parts = [
+                        "あなたは優秀な広告コンサルタントです。",
+                        "以下に示すバナー画像と詳細情報をもとに、バナー広告の改善点を的確に指摘してください。",
+                        "出力はMarkdown形式で、読みやすいようにセクション分けしてください。",
+                        "各評価項目には点数をつけ、その根拠と具体的な改善提案を詳細に記述してください。",
+                        "ユーザーは広告運用の専門家ではないため、専門用語は避け、分かりやすい言葉で説明してください。",
+                        "出力は以下の項目を必ず含めてください。",
+                        "---",
+                        "## 評価サマリー",
+                        "総合スコア（100点満点）：",
+                        "## 各評価項目と改善提案",
+                        "### 1. 視認性・可読性 (20点満点)",
+                        "- **評価点**：",
+                        "- **根拠と改善提案**：",
+                        "### 2. 訴求力・メッセージ性 (20点満点)",
+                        "- **評価点**：",
+                        "- **根拠と改善提案**：",
+                        "### 3. デザイン・クリエイティブ (20点満点)",
+                        "- **評価点**：",
+                        "- **根拠と改善提案**：",
+                        "### 4. ターゲット適合性 (20点満点)",
+                        "- **評価点**：",
+                        "- **根拠と改善提案**：",
+                        "### 5. CTA（Call To Action）の明確さ (20点満点)",
+                        "- **評価点**：",
+                        "- **根拠と改善提案**：",
+                        "---",
+                        "## 総合的な改善アドバイス",
+                        "- ",
+                        "- ",
+                        "---",
+                        "【バナー詳細情報】",
+                        f"バナーの名前: {banner_name}",
+                        f"掲載媒体: {platform}",
+                        f"業種カテゴリ: {category}",
+                        f"ターゲット層: {target_audience}",
+                        f"商品・サービスの特徴やメリット: {product_features}",
+                        f"広告の目的: {ad_goal}"
+                    ]
 
-    uploaded_file_a = st.file_uploader("Aパターン画像をアップロード", type=["png", "jpg", "jpeg"], key="a_upload")
-    uploaded_file_b = st.file_uploader("Bパターン画像をアップロード", type=["png", "jpg", "jpeg"], key="b_upload")
+                    if add_ctr:
+                        prompt_parts.insert(1, "さらに、このバナーの予想クリック率（CTR）を小数点以下2桁までパーセンテージで予測してください。")
+                        prompt_parts.append("## 予想CTR")
+                        prompt_parts.append("- 予想CTR: X.XX%")
 
-    # Initialize session state for results
-    if 'score_a' not in st.session_state: st.session_state.score_a = None
-    if 'comment_a' not in st.session_state: st.session_state.comment_a = None
-    if 'yakujihou_a' not in st.session_state: st.session_state.yakujihou_a = None
-    if 'score_b' not in st.session_state: st.session_state.score_b = None
-    if 'comment_b' not in st.session_state: st.session_state.comment_b = None
-    if 'yakujihou_b' not in st.session_state: st.session_state.yakujihou_b = None
+                    if check_typos:
+                        prompt_parts.insert(1, "提供する改善コメントには誤字脱字がないか、完璧に校正してください。")
 
-    # --- A Pattern Processing ---
-    if uploaded_file_a:
-        st.markdown("#### 🔷 Aパターン診断")
-        
-        img_col_a, result_col_a = st.columns([1, 2])
+                    prompt = "\n".join(prompt_parts)
 
-        with img_col_a:
-            st.image(Image.open(uploaded_file_a), caption="Aパターン画像", use_container_width=True)
-            if st.button("Aパターンを採点", key="score_a_button"): # Changed key to avoid conflict
-                if remaining_uses <= 0:
-                    st.warning(f"残り回数がありません。（{user_plan}プラン）")
-                    st.info("利用回数を増やすには、プランのアップグレードが必要です。")
-                else:
-                    if auth_utils.update_user_uses_in_firestore(st.session_state["user"]):
-                        image_a_bytes = io.BytesIO()
-                        Image.open(uploaded_file_a).save(image_a_bytes, format="PNG")
-                        image_filename_a = f"banner_A_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
-                        
-                        image_url_a = auth_utils.upload_image_to_firebase_storage(
-                            st.session_state["user"], image_a_bytes, image_filename_a
-                        )
+                    response = client.chat.completions.create(
+                        model="gpt-4o",
+                        messages=[
+                            {
+                                "role": "user",
+                                "content": [
+                                    {"type": "text", "text": prompt},
+                                    {
+                                        "type": "image_url",
+                                        "image_url": {
+                                            "url": f"data:{image_mime_type};base64,{base64_image}"
+                                        },
+                                    },
+                                ],
+                            }
+                        ],
+                        max_tokens=1500,
+                        temperature=0.7,
+                    )
+                    
+                    diagnosis_result = response.choices[0].message.content
 
-                        if image_url_a:
-                            with st.spinner("AIがAパターンを採点中です..."):
-                                try:
-                                    ctr_instruction = "また、このバナー広告の予想CTR（クリックスルー率）もパーセンテージで示してください。" if add_ctr else ""
-                                    typo_instruction = "生成する改善コメントに誤字脱字がないか厳密にチェックしてください。" if check_typos else ""
-                                    
-                                    ai_prompt_text = f"""
-以下のバナー画像をプロ視点で採点してください。
-この広告のターゲット年代は「{age_group}」で、主な目的は「{purpose}」です。
-
-【評価基準】
-1. 内容が一瞬で伝わるか
-2. コピーの見やすさ
-3. 行動喚起
-4. 写真とテキストの整合性
-5. 情報量のバランス
-
-【ターゲット年代「{age_group}」と目的「{purpose}」を考慮した具体的なフィードバックをお願いします。】
-{ctr_instruction}
-{typo_instruction}
-
-【出力形式】
----
-スコア：{score_format}
-改善コメント：2～3行でお願いします
-{ "予想CTR：X.X%" if add_ctr else "" }
----"""
-                                    if client:
-                                        img_str_a = base64.b64encode(image_a_bytes.getvalue()).decode()
-                                        response_a = client.chat.completions.create(
-                                            model="gpt-4o",
-                                            messages=[
-                                                {"role": "system", "content": "あなたは広告のプロです。"},
-                                                {"role": "user", "content": [
-                                                    {"type": "text", "text": ai_prompt_text},
-                                                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str_a}"}}
-                                                ]}
-                                            ],
-                                            max_tokens=600
-                                        )
-                                        content_a = response_a.choices[0].message.content
-                                    else:
-                                        content_a = "---\nスコア：A+\n改善コメント：プロフェッショナルなデザインで非常に優秀です。\n予想CTR：5.5%\n---"
-                                    st.session_state.ai_response_a = content_a
-
-                                    score_match_a = re.search(r"スコア[:：]\s*(.+)", content_a)
-                                    comment_match_a = re.search(r"改善コメント[:：]\s*(.+)", content_a, re.DOTALL)
-                                    ctr_match_a = re.search(r"予想CTR[:：]\s*(.+)", content_a)
-                                    
-                                    st.session_state.score_a = score_match_a.group(1).strip() if score_match_a else "取得できず"
-                                    st.session_state.comment_a = comment_match_a.group(1).strip() if comment_match_a else "取得できず"
-                                    st.session_state.ctr_a = ctr_match_a.group(1).strip() if ctr_match_a else None
-
-                                    firestore_record_data = {
-                                        "user_name": sanitize(user_name), "banner_name": sanitize(banner_name), "pattern": "A",
-                                        "platform": sanitize(platform), "category": sanitize(category), "industry": sanitize(industry),
-                                        "age_group": sanitize(age_group), "purpose": sanitize(purpose), "genre": sanitize(genre),
-                                        "score": sanitize(st.session_state.score_a), "comment": sanitize(st.session_state.comment_a),
-                                        "predicted_ctr": sanitize(st.session_state.ctr_a) if add_ctr else "N/A",
-                                        "result": sanitize(result_input), "follower_gain": sanitize(follower_gain_input), "memo": sanitize(memo_input),
-                                        "image_url": image_url_a
-                                    }
-                                    if auth_utils.add_diagnosis_record_to_firestore(st.session_state["user"], firestore_record_data):
-                                        st.success("診断結果をFirestoreに記録しました！")
-                                    else:
-                                        st.error("診断結果のFirestore記録に失敗しました。")
-
-                                except Exception as e:
-                                    st.error(f"AI採点中にエラーが発生しました（Aパターン）: {str(e)}")
-                                    st.session_state.score_a = "エラー"
-                                    st.session_state.comment_a = "AI応答エラー"
-                        else:
-                            st.error("画像アップロードに失敗したため、採点を行いませんでした。")
+                    # --- 実行回数を1回減らす ---
+                    if auth_utils.update_user_uses_in_firestore(user_uid):
+                        st.session_state.remaining_uses -= 1 # UI上の表示も更新
                     else:
                         st.error("利用回数の更新に失敗しました。")
-                st.success("Aパターンの診断が完了しました！")
-        
-        with result_col_a:
-            if st.session_state.score_a:
-                st.markdown("### 🎯 Aパターン診断結果")
-                st.metric("総合スコア", st.session_state.score_a)
-                if st.session_state.get("ctr_a"):
-                    st.metric("予想CTR", st.session_state.ctr_a)
-                st.info(f"**改善コメント:** {st.session_state.comment_a}")
-                
-                if industry in ["美容", "健康", "医療"]:
-                    # (Yakujihou check logic remains the same)
-                    ...
+                        # 失敗しても結果は表示するが、ユーザーには通知
 
-    # --- B Pattern Processing ---
-    # (This section would be structured similarly to A Pattern Processing, with its own button and session state variables)
-    ...
+                    # --- 診断結果の表示 ---
+                    st.subheader("診断結果")
+                    st.markdown(diagnosis_result)
+
+                    # --- 結果からスコアとCTRを抽出 ---
+                    overall_score = 0
+                    predicted_ctr = None
+                    match_score = re.search(r"総合スコア（100点満点）：\s*(\d+)", diagnosis_result)
+                    if match_score:
+                        overall_score = int(match_score.group(1))
+                    
+                    if add_ctr:
+                        match_ctr = re.search(r"予想CTR:\s*(\d+\.\d+)%", diagnosis_result)
+                        if match_ctr:
+                            predicted_ctr = float(match_ctr.group(1))
+
+                    # --- 画像をFirebase Storageにアップロード ---
+                    image_url = None
+                    if st.session_state.uploaded_image_bytes:
+                        # ファイル名に日付と時刻を追加してユニークにする
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        unique_filename = f"{timestamp}_{st.session_state.uploaded_image_filename}"
+                        
+                        image_bytes_io = io.BytesIO(st.session_state.uploaded_image_bytes)
+                        image_url = auth_utils.upload_image_to_firebase_storage(
+                            user_uid,
+                            image_bytes_io,
+                            unique_filename
+                        )
+                        if image_url:
+                            st.success("バナー画像を保存しました！")
+                        else:
+                            st.error("バナー画像の保存に失敗しました。")
+
+
+                    # --- 診断結果をFirestoreに保存 ---
+                    record_data = {
+                        "user_name": user_email,
+                        "banner_name": banner_name,
+                        "platform": platform,
+                        "category": category,
+                        "target_audience": target_audience,
+                        "product_features": product_features,
+                        "ad_goal": ad_goal,
+                        "score": overall_score,
+                        "predicted_ctr": predicted_ctr, # Noneの場合もある
+                        "diagnosis_result": diagnosis_result,
+                        "image_url": image_url # 画像URLを追加
+                    }
+                    if auth_utils.add_diagnosis_record_to_firestore(user_uid, record_data):
+                        st.success("診断結果を実績記録ページに保存しました！")
+                    else:
+                        st.error("診断結果の保存に失敗しました。")
+
+
+                    # --- GAS連携（既存の連携があればそのまま） ---
+                    payload = {
+                        "timestamp": datetime.now().isoformat(),
+                        "user_id": sanitize(user_uid),
+                        "email": sanitize(user_email),
+                        "plan": sanitize(user_plan),
+                        "banner_name": sanitize(banner_name),
+                        "platform": sanitize(platform),
+                        "category": sanitize(category),
+                        "target_audience": sanitize(target_audience),
+                        "product_features": sanitize(product_features),
+                        "ad_goal": sanitize(ad_goal),
+                        "score": sanitize(overall_score),
+                        "predicted_ctr": sanitize(predicted_ctr),
+                        "image_url": sanitize(image_url),
+                        "diagnosis_result": diagnosis_result # 診断結果全文
+                    }
+
+                    try:
+                        res = requests.post(GAS_URL, data=json.dumps(payload))
+                        res.raise_for_status() # HTTPエラーがあれば例外を発生させる
+                        # st.success("診断結果をスプレッドシートに記録しました！")
+                    except requests.exceptions.RequestException as e:
+                        st.warning(f"スプレッドシートへの記録に失敗しました: {e}")
+                        st.warning("スプレッドシートへの連携が不要であれば無視してください。")
+
+
+                except OpenAI.APIStatusError as e:
+                    if e.status_code == 429:
+                        st.error("APIのレート制限に達しました。しばらく待ってから再度お試しください。")
+                    else:
+                        st.error(f"OpenAI APIエラーが発生しました: {e.status_code} - {e.response}")
+                except Exception as e:
+                    st.error(f"診断中に予期せぬエラーが発生しました: {e}")
+
+# --- A/Bテスト比較機能 (既存のまま) ---
+st.markdown("---")
+st.header("✨ A/Bテスト比較")
+st.subheader("2つのバナー広告を比較し、より効果的な方を見つけます。")
+
+colA, colB = st.columns(2)
+
+with colA:
+    st.subheader("バナーA")
+    uploaded_file_a = st.file_uploader("バナーAをアップロード", type=["jpg", "png"], key="uploader_a")
+    name_a = st.text_input("バナーAの名前", key="name_a")
+    if uploaded_file_a:
+        st.image(uploaded_file_a, caption="バナーA", use_column_width=True)
+
+with colB:
+    st.subheader("バナーB")
+    uploaded_file_b = st.file_uploader("バナーBをアップロード", type=["jpg", "png"], key="uploader_b")
+    name_b = st.text_input("バナーBの名前", key="name_b")
+    if uploaded_file_b:
+        st.image(uploaded_file_b, caption="バナーB", use_column_width=True)
+
+compare_button = st.button("📈 比較診断！", key="compare_button")
+
+if compare_button:
+    if client is None:
+        st.error("OpenAI APIキーが設定されていないため、比較診断を実行できません。")
+        st.stop()
     
-with col2:
-    st.markdown("### 採点基準はこちら")
-    with st.container():
-        st.markdown("バナスコAIは以下の観点に基づいて広告画像を評価します。")
-        st.markdown(
-            """
-        - **1. 内容が一瞬で伝わるか**
-          - 伝えたいことが最初の1秒でターゲットに伝わるか。
-        - **2. コピーの見やすさ**
-          - 文字が読みやすいか、サイズや配色が適切か。
-        - **3. 行動喚起の明確さ**
-          - 『今すぐ予約』『LINE登録』などの行動喚起が明確で、ユーザーを誘導できているか。
-        - **4. 写真とテキストの整合性**
-          - 背景画像と文字内容が一致し、全体として違和感がないか。
-        - **5. 情報量のバランス**
-          - 文字が多すぎず、視線誘導が自然で、情報が過負荷にならないか。
-        """
-        )
+    # --- 実行回数チェック ---
+    if remaining_uses <= 0:
+        st.warning(f"今月の利用回数を使い切りました。（現在プラン：{user_plan}）")
+        st.info("利用回数は毎月1日にリセットされます。または、プランのアップグレードをご検討ください。")
+        st.stop()
 
-# Note: The B Pattern and A/B Test comparison sections are omitted for brevity, but they should be updated
-# with the same logic as the A Pattern section (new features, correct session state keys, etc.).
+    if not (uploaded_file_a and uploaded_file_b and name_a and name_b):
+        st.error("両方のバナー画像と名前を入力してください。")
+        st.stop()
+    
+    # 画像をBase64にエンコード
+    image_a_bytes = uploaded_file_a.getvalue()
+    base64_image_a = base64.b64encode(image_a_bytes).decode('utf-8')
+    image_a_mime_type = uploaded_file_a.type
+
+    image_b_bytes = uploaded_file_b.getvalue()
+    base64_image_b = base64.b64encode(image_b_bytes).decode('utf-8')
+    image_b_mime_type = uploaded_file_b.type
+
+    with st.spinner("AIがバナーを比較診断中..."):
+        try:
+            comparison_prompt = f"""
+            あなたは優秀な広告コンサルタントです。
+            2つのバナー画像（{name_a}と{name_b}）を比較し、どちらがより優れているか、
+            そしてそれぞれのバナーの長所と短所、具体的な改善点を詳細に分析してください。
+            広告効果を高めるための実践的なアドバイスを含めてください。
+            出力はMarkdown形式で、比較表を含め、明確な結論と根拠を示してください。
+
+            比較する項目例：
+            - 視認性・可読性
+            - 訴求力・メッセージ性
+            - デザイン・クリエイティブ
+            - ターゲット適合性
+            - CTAの明確さ
+
+            最終的な結論として、どちらのバナーが推奨されるかを明記してください。
+            """
+
+            response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": comparison_prompt},
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:{image_a_mime_type};base64,{base64_image_a}"
+                                },
+                            },
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:{image_b_mime_type};base64,{base64_image_b}"
+                                },
+                            },
+                        ],
+                    }
+                ],
+                max_tokens=2000,
+                temperature=0.7,
+            )
+            comparison_result = response.choices[0].message.content
+
+            # --- 実行回数を1回減らす ---
+            if auth_utils.update_user_uses_in_firestore(user_uid):
+                st.session_state.remaining_uses -= 1 # UI上の表示も更新
+            else:
+                st.error("利用回数の更新に失敗しました。")
+
+
+            st.subheader("比較診断結果")
+            st.markdown(comparison_result)
+
+        except OpenAI.APIStatusError as e:
+            if e.status_code == 429:
+                st.error("APIのレート制限に達しました。しばらく待ってから再度お試しください。")
+            else:
+                st.error(f"OpenAI APIエラーが発生しました: {e.status_code} - {e.response}")
+        except Exception as e:
+            st.error(f"比較診断中に予期せぬエラーが発生しました: {e}")
