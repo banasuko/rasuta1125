@@ -504,7 +504,7 @@ with col1:
 
         with img_col_a:
             st.image(Image.open(uploaded_file_a), caption="Aパターン画像", use_container_width=True)
-            if st.button("Aパターンを採点", key="score_a_button"): # Changed key to avoid conflict
+            if st.button("Aパターンを採点", key="score_a_button"):
                 if remaining_uses <= 0:
                     st.warning(f"残り回数がありません。（{user_plan}プラン）")
                     st.info("利用回数を増やすには、プランのアップグレードが必要です。")
