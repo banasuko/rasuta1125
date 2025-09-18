@@ -25,12 +25,14 @@ def sanitize(value):
 # Streamlit UI configuration
 st.set_page_config(layout="wide", page_title="バナスコAI")
 
-# --- Logo Display ---
-logo_path = "banasuko_logo_icon.png"
+# --- ★★★ロゴのエラー修正★★★ ---
+# Get the absolute path to the directory of the current script
+script_dir = os.path.dirname(os.path.abspath(__file__))
+logo_path = os.path.join(script_dir, "banasuko_logo_icon.png")
 
 try:
     logo_image = Image.open(logo_path)
-    st.sidebar.image(logo_image, use_container_width=True) # Display logo in sidebar, adjusting to column width
+    st.sidebar.image(logo_image, use_container_width=True)
 except FileNotFoundError:
     st.sidebar.error(f"ロゴ画像 '{logo_path}' が見つかりません。ファイルが正しく配置されているか確認してください。")
 
@@ -360,7 +362,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# --- ★★★ここから追加★★★ ---
+# --- ★★★ここからStripe機能を追加★★★ ---
 # --- Plan Management UI in Sidebar ---
 with st.sidebar.expander("プラン管理", expanded=True):
     light_plan_price_id = os.getenv("PRICE_ID_LIGHT")
@@ -389,20 +391,17 @@ with st.sidebar.expander("プラン管理", expanded=True):
                         st.markdown(f'<meta http-equiv="refresh" content="0; url={portal_url}">', unsafe_allow_html=True)
             else:
                 st.error("顧客情報の取得に失敗しました。")
-# --- ★★★ここまで追加★★★ ---
+# --- ★★★ここまでStripe機能を追加★★★ ---
 
 
 # --- Clean Professional Header ---
 st.markdown('<div class="main-header">', unsafe_allow_html=True)
-
-# Use standard Streamlit components instead of complex HTML
 st.markdown("# バナスコAI")
 st.markdown("## AI広告診断システム")
 st.markdown("### もう、無駄打ちしない。広告を\"武器\"に変えるプロフェッショナルAIツール")
-
 st.markdown("---")
 
-# --- ★★★ここから追加★★★ ---
+# --- ★★★ここからStripe機能を追加★★★ ---
 # 決済完了後にStripeからリダイレクトされた際の成功メッセージ
 query_params = st.query_params
 if "session_id" in query_params:
@@ -410,7 +409,7 @@ if "session_id" in query_params:
     st.balloons()
     # 画面リロード時の再表示を防ぐためにクエリパラメータを削除
     st.query_params.clear()
-# --- ★★★ここまで追加★★★ ---
+# --- ★★★ここまでStripe機能を追加★★★ ---
 
 
 # Add professional badge
