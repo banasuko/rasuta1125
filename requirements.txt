@@ -1,7 +1,13 @@
 streamlit
-pillow
 requests
+Pillow
 openai
-firebase-admin
 python-dotenv
-fpdf2
+firebase-admin
+pandas
+gspread
+gspread-dataframe
+oauth2client
+stripe
+flask
+gunicorn
