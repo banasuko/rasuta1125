@@ -1,4 +1,4 @@
-import streamlit as st
+mport streamlit as st
 import base64
 import io
 import os
