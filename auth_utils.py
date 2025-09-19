@@ -90,7 +90,7 @@ def get_user_data_from_firestore(uid):
     global db
     doc_ref = db.collection('users').document(uid)
     doc = doc_ref.get()
-    
+
     if doc.exists:
         data = doc.to_dict()
         now = datetime.now(timezone.utc)
@@ -102,14 +102,14 @@ def get_user_data_from_firestore(uid):
                 needs_reset = True
         else:
             needs_reset = True
-            
+
         if needs_reset:
             plan = data.get("plan", "Free")
             plan_monthly_uses = {
-                "Free": 5, "Guest": 0, "Light": 50, "Pro": 200, "Team": 500, "Enterprise": 1000
+                "Free": 10, "Guest": 0, "Light": 50, "Pro": 200, "Team": 500, "Enterprise": 1000
             }
             new_remaining_uses = plan_monthly_uses.get(plan, 0)
-            
+
             doc_ref.update({
                 "remaining_uses": new_remaining_uses,
                 "last_reset": now.isoformat()
@@ -121,7 +121,7 @@ def get_user_data_from_firestore(uid):
         st.session_state.remaining_uses = data.get("remaining_uses", 0)
     else:
         st.session_state.plan = "Free"
-        st.session_state.remaining_uses = 5
+        st.session_state.remaining_uses = 10
         doc_ref.set({
             "email": st.session_state.email,
             "plan": st.session_state.plan,
@@ -146,7 +146,6 @@ def update_user_uses_in_firestore(uid, uses_to_deduct=1):
 
 def add_diagnosis_record_to_firestore(uid, record_data):
     global db
-    # diagnosesサブコレクションにドキュメントを追加
     doc_ref = db.collection('users').document(uid).collection('diagnoses').document()
     try:
         record_data["created_at"] = firestore.SERVER_TIMESTAMP
@@ -156,7 +155,6 @@ def add_diagnosis_record_to_firestore(uid, record_data):
         st.error(f"診断記録のFirestore保存に失敗しました: {e}")
         return False
 
-# ★★★★★ ここからが追加された関数 ★★★★★
 def get_diagnosis_records_from_firestore(uid):
     """Firestoreから特定ユーザーの実績記録をすべて取得する"""
     global db
@@ -173,20 +171,16 @@ def save_diagnosis_records_to_firestore(uid, records_df):
     global db
     user_diagnoses_ref = db.collection('users').document(uid).collection('diagnoses')
 
-    # 現在のコレクション内のドキュメントをすべて削除（より安全な方法としてバッチ処理を推奨）
     for doc in user_diagnoses_ref.stream():
         doc.reference.delete()
 
-    # DataFrameの各行を新しいドキュメントとして追加
     for _, row in records_df.iterrows():
         record_data = row.to_dict()
-        # 'id'列はFirestoreに不要なので削除
         if 'id' in record_data:
             del record_data['id']
         record_data["created_at"] = firestore.SERVER_TIMESTAMP
         user_diagnoses_ref.add(record_data)
     return True
-# ★★★★★ ここまでが追加された関数 ★★★★★
 
 def upload_image_to_firebase_storage(uid, image_bytes_io, filename):
     try:
