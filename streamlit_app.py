@@ -466,7 +466,18 @@ with col1:
 
     st.markdown("### 詳細設定")
     with st.container():
-        industry = st.selectbox("業種", ["美容", "飲食", "不動産", "子ども写真館", "その他"], key="industry")
+        # ★★★ ここから変更 ★★★
+        industry = st.selectbox(
+            "業種",
+            [
+                "美容", "飲食", "不動産", "子ども写真館",
+                "スクール・習い事", "健康・フィットネス", "ファッション・アパレル",
+                "人材・求人", "金融・保険", "エンタメ", "旅行・レジャー",
+                "EC・通販", "BtoBサービス", "その他"
+            ],
+            key="industry"
+        )
+        # ★★★ ここまで変更 ★★★
         genre = st.selectbox("ジャンル", ["お客様の声", "商品紹介", "ノウハウ", "世界観", "キャンペーン"], key="genre")
         score_format = st.radio("スコア形式", ["A/B/C", "100点満点"], horizontal=True, key="score_format")
         ab_pattern = st.radio("ABテストパターン", ["Aパターン", "Bパターン", "該当なし"], horizontal=True, key="ab_pattern")
@@ -577,7 +588,6 @@ with col1:
                                     st.session_state.comment_a = comment_match_a.group(1).strip() if comment_match_a else "取得できず"
                                     st.session_state.ctr_a = ctr_match_a.group(1).strip() if ctr_match_a else None
 
-                                    # ★★★ ここから変更 ★★★
                                     if user_plan in ["Pro", "Team", "Enterprise"]:
                                         firestore_record_data = {
                                             "user_name": sanitize(user_name), "banner_name": sanitize(banner_name), "pattern": "A",
@@ -592,7 +602,6 @@ with col1:
                                             st.success("診断結果を実績記録ページに記録しました！")
                                         else:
                                             st.error("診断結果の記録に失敗しました。")
-                                    # ★★★ ここまで変更 ★★★
 
                                 except Exception as e:
                                     st.error(f"AI採点中にエラーが発生しました（Aパターン）: {str(e)}")
@@ -602,7 +611,7 @@ with col1:
                             st.error("画像アップロードに失敗したため、採点を行いませんでした。")
                     else:
                         st.error("利用回数の更新に失敗しました。")
-                st.rerun() # 結果表示を確実にするため再実行
+                st.rerun() 
         
         with result_col_a:
             if st.session_state.score_a:
@@ -612,12 +621,11 @@ with col1:
                     st.metric("予想CTR", st.session_state.ctr_a)
                 st.info(f"**改善コメント:** {st.session_state.comment_a}")
                 
-                if industry in ["美容", "健康", "医療"]:
-                    # (Yakujihou check logic can be added here)
-                    st.warning("【薬機法】美容・健康・医療系の広告では、効果効能を保証する表現にご注意ください。")
+                if industry in ["美容", "健康・フィットネス"]:
+                    st.warning("【薬機法】美容・健康系の広告では、効果効能を保証する表現にご注意ください。")
 
-    # --- B Pattern Processing (同様のロジックを適用) ---
-    # ...
+    # --- B Pattern Processing ---
+    # (Bパターンの処理も同様に修正してください)
     
 with col2:
     st.markdown("### 採点基準はこちら")
