@@ -171,14 +171,18 @@ def save_diagnosis_records_to_firestore(uid, records_df):
     global db
     user_diagnoses_ref = db.collection('users').document(uid).collection('diagnoses')
 
+    # 現在のコレクション内のドキュメントをすべて削除
     for doc in user_diagnoses_ref.stream():
         doc.reference.delete()
 
+    # DataFrameの各行を新しいドキュメントとして追加
     for _, row in records_df.iterrows():
         record_data = row.to_dict()
         if 'id' in record_data:
             del record_data['id']
-        record_data["created_at"] = firestore.SERVER_TIMESTAMP
+        # タイムスタンプをFirestoreのTimestamp型に変換
+        if 'created_at' in record_data and pd.notna(record_data['created_at']):
+             record_data['created_at'] = firestore.SERVER_TIMESTAMP
         user_diagnoses_ref.add(record_data)
     return True
 
@@ -255,5 +259,11 @@ def check_login():
         st.stop()
     else:
         st.sidebar.write(f"ようこそ, {st.session_state.email}!")
-        st.sidebar.write(f"残り回数: {st.session_state.remaining_uses}回 ({st.session_state.plan}プラン)")
+        st.sidebar.markdown("---")
+        st.sidebar.write(f"**現在のプラン:** {st.session_state.plan}")
+        st.sidebar.write(f"**今月の残回数:** {st.session_state.remaining_uses}回")
+        
+        st.sidebar.page_link("pages/3_プラン購入.py", label="💎 プランの確認・購入はこちら", icon="💎")
+        st.sidebar.markdown("---")
+        
         st.sidebar.button("ログアウト", on_click=logout)
