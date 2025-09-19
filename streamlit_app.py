@@ -10,10 +10,8 @@ from openai import OpenAI
 
 import auth_utils # Import Firebase authentication
 
-
 # Google Apps Script (GAS) and Google Drive information (GAS for legacy spreadsheet, will be removed later if not needed)
 GAS_URL = "https://script.google.com/macros/s/AKfycby_uD6Jtb9GT0-atbyPKOPc8uyVKodwYVIQ2Tpe-_E8uTOPiir0Ce1NAPZDEOlCUxN4/exec" # Update this URL to your latest GAS deployment URL
-
 
 # Helper function to sanitize values
 def sanitize(value):
@@ -21,7 +19,6 @@ def sanitize(value):
     if value is None or value == "取得できず":
         return "エラー"
     return value
-
 
 # Streamlit UI configuration
 st.set_page_config(layout="wide", page_title="バナスコAI")
@@ -512,12 +509,13 @@ with col1:
 
         with img_col_a:
             st.image(Image.open(uploaded_file_a), caption="Aパターン画像", use_container_width=True)
-            if st.button("Aパターンを採点", key="score_a_button"): # Changed key to avoid conflict
+            if st.button("Aパターンを採点", key="score_a_button"):
                 if remaining_uses <= 0:
                     st.warning(f"残り回数がありません。（{user_plan}プラン）")
                     st.info("利用回数を増やすには、プランのアップグレードが必要です。")
                 else:
                     if auth_utils.update_user_uses_in_firestore(st.session_state["user"]):
+                        st.session_state.remaining_uses -= 1 # UI上の残回数を即時更新
                         image_a_bytes = io.BytesIO()
                         Image.open(uploaded_file_a).save(image_a_bytes, format="PNG")
                         image_filename_a = f"banner_A_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
@@ -579,19 +577,22 @@ with col1:
                                     st.session_state.comment_a = comment_match_a.group(1).strip() if comment_match_a else "取得できず"
                                     st.session_state.ctr_a = ctr_match_a.group(1).strip() if ctr_match_a else None
 
-                                    firestore_record_data = {
-                                        "user_name": sanitize(user_name), "banner_name": sanitize(banner_name), "pattern": "A",
-                                        "platform": sanitize(platform), "category": sanitize(category), "industry": sanitize(industry),
-                                        "age_group": sanitize(age_group), "purpose": sanitize(purpose), "genre": sanitize(genre),
-                                        "score": sanitize(st.session_state.score_a), "comment": sanitize(st.session_state.comment_a),
-                                        "predicted_ctr": sanitize(st.session_state.ctr_a) if add_ctr else "N/A",
-                                        "result": sanitize(result_input), "follower_gain": sanitize(follower_gain_input), "memo": sanitize(memo_input),
-                                        "image_url": image_url_a
-                                    }
-                                    if auth_utils.add_diagnosis_record_to_firestore(st.session_state["user"], firestore_record_data):
-                                        st.success("診断結果をFirestoreに記録しました！")
-                                    else:
-                                        st.error("診断結果のFirestore記録に失敗しました。")
+                                    # ★★★ ここから変更 ★★★
+                                    if user_plan in ["Pro", "Team", "Enterprise"]:
+                                        firestore_record_data = {
+                                            "user_name": sanitize(user_name), "banner_name": sanitize(banner_name), "pattern": "A",
+                                            "platform": sanitize(platform), "category": sanitize(category), "industry": sanitize(industry),
+                                            "age_group": sanitize(age_group), "purpose": sanitize(purpose), "genre": sanitize(genre),
+                                            "score": sanitize(st.session_state.score_a), "comment": sanitize(st.session_state.comment_a),
+                                            "predicted_ctr": sanitize(st.session_state.ctr_a) if add_ctr else "N/A",
+                                            "result": sanitize(result_input), "follower_gain": sanitize(follower_gain_input), "memo": sanitize(memo_input),
+                                            "image_url": image_url_a
+                                        }
+                                        if auth_utils.add_diagnosis_record_to_firestore(st.session_state["user"], firestore_record_data):
+                                            st.success("診断結果を実績記録ページに記録しました！")
+                                        else:
+                                            st.error("診断結果の記録に失敗しました。")
+                                    # ★★★ ここまで変更 ★★★
 
                                 except Exception as e:
                                     st.error(f"AI採点中にエラーが発生しました（Aパターン）: {str(e)}")
@@ -601,7 +602,7 @@ with col1:
                             st.error("画像アップロードに失敗したため、採点を行いませんでした。")
                     else:
                         st.error("利用回数の更新に失敗しました。")
-                st.success("Aパターンの診断が完了しました！")
+                st.rerun() # 結果表示を確実にするため再実行
         
         with result_col_a:
             if st.session_state.score_a:
@@ -612,12 +613,11 @@ with col1:
                 st.info(f"**改善コメント:** {st.session_state.comment_a}")
                 
                 if industry in ["美容", "健康", "医療"]:
-                    # (Yakujihou check logic remains the same)
-                    ...
+                    # (Yakujihou check logic can be added here)
+                    st.warning("【薬機法】美容・健康・医療系の広告では、効果効能を保証する表現にご注意ください。")
 
-    # --- B Pattern Processing ---
-    # (This section would be structured similarly to A Pattern Processing, with its own button and session state variables)
-    ...
+    # --- B Pattern Processing (同様のロジックを適用) ---
+    # ...
     
 with col2:
     st.markdown("### 採点基準はこちら")
@@ -637,6 +637,3 @@ with col2:
           - 文字が多すぎず、視線誘導が自然で、情報が過負荷にならないか。
         """
         )
-
-# Note: The B Pattern and A/B Test comparison sections are omitted for brevity, but they should be updated
-# with the same logic as the A Pattern section (new features, correct session state keys, etc.).
