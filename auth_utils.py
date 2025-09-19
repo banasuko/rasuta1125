@@ -1,3 +1,4 @@
+# auth_utils.py
 import streamlit as st
 import os
 import requests
@@ -6,7 +7,6 @@ import firebase_admin
 from firebase_admin import credentials, firestore, storage
 import json
 from datetime import datetime, timezone
-import stripe # ★Stripeライブラリをインポート
 
 # .envファイルから環境変数を読み込む
 load_dotenv()
@@ -14,46 +14,52 @@ load_dotenv()
 # --- グローバル変数の定義 ---
 db = None
 
-# --- ★★★ここから変更★★★ ---
 # --- 環境変数の読み込みとチェック ---
 FIREBASE_API_KEY = os.getenv("FIREBASE_WEB_API_KEY")
+FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID")
+ADMIN_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID_ADMIN")
+ADMIN_PRIVATE_KEY_RAW = os.getenv("FIREBASE_PRIVATE_KEY_ADMIN")
+ADMIN_CLIENT_EMAIL = os.getenv("FIREBASE_CLIENT_EMAIL_ADMIN")
 STORAGE_BUCKET = os.getenv("FIREBASE_STORAGE_BUCKET")
-# Stripeと安全なFirebase認証用の変数を追加
-STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")
-FIREBASE_SERVICE_ACCOUNT_JSON = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")
-
 
 # 必須の環境変数が設定されているかチェック
 missing_vars = []
 if not FIREBASE_API_KEY: missing_vars.append("FIREBASE_WEB_API_KEY")
+if not FIREBASE_PROJECT_ID: missing_vars.append("FIREBASE_PROJECT_ID")
+if not ADMIN_PROJECT_ID: missing_vars.append("FIREBASE_PROJECT_ID_ADMIN")
+if not ADMIN_PRIVATE_KEY_RAW: missing_vars.append("FIREBASE_PRIVATE_KEY_ADMIN")
+if not ADMIN_CLIENT_EMAIL: missing_vars.append("FIREBASE_CLIENT_EMAIL_ADMIN")
 if not STORAGE_BUCKET: missing_vars.append("FIREBASE_STORAGE_BUCKET")
-# 新しい必須変数をチェックリストに追加
-if not STRIPE_SECRET_KEY: missing_vars.append("STRIPE_SECRET_KEY")
-if not FIREBASE_SERVICE_ACCOUNT_JSON: missing_vars.append("FIREBASE_SERVICE_ACCOUNT_JSON")
-
 
 if missing_vars:
     st.error(f"❌ 必須の環境変数が不足しています: {', '.join(missing_vars)}。Streamlit CloudのSecretsを確認してください。")
     st.stop()
 
-# --- APIキーの設定 ---
-stripe.api_key = STRIPE_SECRET_KEY
-
-# --- Firebase Admin SDKの初期化 (より安全な方法に変更) ---
+# --- Firebase Admin SDKの初期化 ---
 try:
     if not firebase_admin._apps:
-        # 環境変数からJSON文字列を読み込み、辞書に変換
-        service_account_info = json.loads(FIREBASE_SERVICE_ACCOUNT_JSON)
+        admin_private_key = ADMIN_PRIVATE_KEY_RAW.replace('\\n', '\n')
+        service_account_info = {
+            "type": "service_account",
+            "project_id": ADMIN_PROJECT_ID,
+            "private_key_id": os.getenv("FIREBASE_PRIVATE_KEY_ID_ADMIN", ""),
+            "private_key": admin_private_key,
+            "client_email": ADMIN_CLIENT_EMAIL,
+            "client_id": os.getenv("FIREBASE_CLIENT_ID_ADMIN", ""),
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+            "client_x509_cert_url": f"https://www.googleapis.com/robot/v1/metadata/x509/{ADMIN_CLIENT_EMAIL.replace('@', '%40')}",
+        }
         cred = credentials.Certificate(service_account_info)
         firebase_admin.initialize_app(cred, {'storageBucket': STORAGE_BUCKET})
     db = firestore.client()
 except Exception as e:
-    st.error(f"❌ Firebase Admin SDKの初期化に失敗しました。SecretsのFIREBASE_SERVICE_ACCOUNT_JSONを確認してください。")
+    st.error(f"❌ Firebase Admin SDKの初期化に失敗しました。サービスアカウントキーを確認してください。")
     st.error(f"エラー詳細: {e}")
     st.stop()
-# --- ★★★ここまで変更★★★ ---
 
-# --- Streamlitのセッションステート初期化 (Stripe顧客IDを追加) ---
+# --- Streamlitのセッションステート初期化 ---
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.user = None
@@ -61,9 +67,8 @@ if "logged_in" not in st.session_state:
     st.session_state.id_token = None
     st.session_state.plan = "Guest"
     st.session_state.remaining_uses = 0
-    st.session_state.stripe_customer_id = None # Stripe顧客ID用のセッションステート
 
-# --- Firebase Authentication REST APIの関数 (変更なし) ---
+# --- Firebase Authentication REST APIの関数 ---
 FIREBASE_AUTH_BASE_URL = "https://identitytoolkit.googleapis.com/v1/accounts:"
 
 def sign_in_with_email_and_password(email, password):
@@ -80,12 +85,8 @@ def create_user_with_email_and_password(email, password):
     response.raise_for_status()
     return response.json()
 
-# --- ★★★ここから変更★★★ ---
-# --- Firestoreの操作関数 (Stripe連携機能を追加) ---
+# --- Firestoreの操作関数 ---
 def get_user_data_from_firestore(uid):
-    """
-    元の月次リセット機能に、Stripe顧客IDの取得・作成機能を追加。
-    """
     global db
     doc_ref = db.collection('users').document(uid)
     doc = doc_ref.get()
@@ -118,51 +119,19 @@ def get_user_data_from_firestore(uid):
 
         st.session_state.plan = data.get("plan", "Free")
         st.session_state.remaining_uses = data.get("remaining_uses", 0)
-        
-        # Stripe顧客IDを取得。なければ作成する。
-        st.session_state.stripe_customer_id = data.get("stripe_customer_id")
-        if not st.session_state.stripe_customer_id:
-            _create_stripe_customer_and_update_firestore(uid, doc_ref)
-
     else:
-        # 新規ユーザー作成時にStripe顧客も一緒に作成する
-        _create_new_user_in_firestore_and_stripe(uid)
-    return True
-
-def _create_stripe_customer_and_update_firestore(uid, doc_ref):
-    """Stripe顧客を作成し、既存のFirestoreドキュメントを更新する"""
-    try:
-        customer = stripe.Customer.create(email=st.session_state.email, metadata={'firebase_uid': uid})
-        st.session_state.stripe_customer_id = customer.id
-        doc_ref.update({'stripe_customer_id': customer.id})
-    except Exception as e:
-        st.error(f"Stripe顧客の作成に失敗: {e}")
-
-def _create_new_user_in_firestore_and_stripe(uid):
-    """新規ユーザーのFirestoreドキュメントとStripe顧客を同時に作成する"""
-    st.session_state.plan = "Free"
-    st.session_state.remaining_uses = 5
-    try:
-        # Stripeで顧客を作成
-        customer = stripe.Customer.create(email=st.session_state.email, metadata={'firebase_uid': uid})
-        st.session_state.stripe_customer_id = customer.id
-        
-        # FirestoreにStripe顧客IDを含めて保存
-        db.collection('users').document(uid).set({
+        st.session_state.plan = "Free"
+        st.session_state.remaining_uses = 5
+        doc_ref.set({
             "email": st.session_state.email,
             "plan": st.session_state.plan,
             "remaining_uses": st.session_state.remaining_uses,
             "created_at": firestore.SERVER_TIMESTAMP,
-            "last_reset": datetime.now(timezone.utc).isoformat(),
-            "stripe_customer_id": customer.id
+            "last_reset": datetime.now(timezone.utc).isoformat()
         })
-    except Exception as e:
-        st.error(f"新規ユーザーのStripe連携に失敗: {e}")
-
-# --- ★★★ここまで変更★★★ ---
+    return True
 
 def update_user_uses_in_firestore(uid, uses_to_deduct=1):
-    # (この関数はお客様の元のコードのまま、変更ありません)
     global db
     doc_ref = db.collection('users').document(uid)
     try:
@@ -170,15 +139,14 @@ def update_user_uses_in_firestore(uid, uses_to_deduct=1):
             "remaining_uses": firestore.Increment(-uses_to_deduct),
             "last_used_at": firestore.SERVER_TIMESTAMP
         })
-        st.session_state.remaining_uses -= uses_to_deduct # セッションステートも更新
         return True
     except Exception as e:
         st.error(f"利用回数の更新に失敗しました: {e}")
         return False
 
 def add_diagnosis_record_to_firestore(uid, record_data):
-    # (この関数はお客様の元のコードのまま、変更ありません)
     global db
+    # diagnosesサブコレクションにドキュメントを追加
     doc_ref = db.collection('users').document(uid).collection('diagnoses').document()
     try:
         record_data["created_at"] = firestore.SERVER_TIMESTAMP
@@ -188,35 +156,39 @@ def add_diagnosis_record_to_firestore(uid, record_data):
         st.error(f"診断記録のFirestore保存に失敗しました: {e}")
         return False
 
+# ★★★★★ ここからが追加された関数 ★★★★★
 def get_diagnosis_records_from_firestore(uid):
-    # (この関数はお客様の元のコードのまま、変更ありません)
+    """Firestoreから特定ユーザーの実績記録をすべて取得する"""
     global db
     records = []
     docs = db.collection('users').document(uid).collection('diagnoses').order_by("created_at", direction=firestore.Query.DESCENDING).stream()
     for doc in docs:
         record = doc.to_dict()
-        record["id"] = doc.id
+        record["id"] = doc.id # ドキュメントIDも追加
         records.append(record)
     return records
 
 def save_diagnosis_records_to_firestore(uid, records_df):
-    # (この関数はお客様の元のコードのまま、変更ありません)
+    """DataFrameの内容でFirestoreの実績記録を上書き保存する"""
     global db
     user_diagnoses_ref = db.collection('users').document(uid).collection('diagnoses')
 
+    # 現在のコレクション内のドキュメントをすべて削除（より安全な方法としてバッチ処理を推奨）
     for doc in user_diagnoses_ref.stream():
         doc.reference.delete()
 
+    # DataFrameの各行を新しいドキュメントとして追加
     for _, row in records_df.iterrows():
         record_data = row.to_dict()
+        # 'id'列はFirestoreに不要なので削除
         if 'id' in record_data:
             del record_data['id']
         record_data["created_at"] = firestore.SERVER_TIMESTAMP
         user_diagnoses_ref.add(record_data)
     return True
+# ★★★★★ ここまでが追加された関数 ★★★★★
 
 def upload_image_to_firebase_storage(uid, image_bytes_io, filename):
-    # (この関数はお客様の元のコードのまま、変更ありません)
     try:
         bucket = storage.bucket()
         blob = bucket.blob(f"users/{uid}/diagnoses_images/{filename}")
@@ -228,9 +200,8 @@ def upload_image_to_firebase_storage(uid, image_bytes_io, filename):
         st.error(f"Firebase Storageへの画像アップロードに失敗しました: {e}")
         return None
 
-# --- StreamlitのUI表示と認証フロー (変更なし) ---
+# --- StreamlitのUI表示と認証フロー ---
 def login_page():
-    # (この関数はお客様の元のコードのまま、変更ありません)
     st.title("🔐 バナスコAI ログイン")
     st.markdown("機能を利用するにはログインが必要です。")
 
@@ -279,20 +250,16 @@ def login_page():
                     st.error(f"予期せぬエラーが発生しました: {e}")
 
 def logout():
-    # (この関数はお客様の元のコードのまま、変更ありません)
     for key in list(st.session_state.keys()):
         del st.session_state[key]
     st.success("ログアウトしました。")
     st.rerun()
 
 def check_login():
-    # (この関数はお客様の元のコードのまま、変更ありません)
     if not st.session_state.get("logged_in"):
         login_page()
         st.stop()
     else:
-        # ★★★サイドバーの表示をメトリックに変更★★★
         st.sidebar.write(f"ようこそ, {st.session_state.email}!")
-        st.sidebar.metric("現在のプラン", st.session_state.plan)
-        st.sidebar.metric("残り回数", f"{st.session_state.remaining_uses}回")
-        st.sidebar.button("ログアウト", on_click=logout, use_container_width=True)
+        st.sidebar.write(f"残り回数: {st.session_state.remaining_uses}回 ({st.session_state.plan}プラン)")
+        st.sidebar.button("ログアウト", on_click=logout)
