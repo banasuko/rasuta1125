@@ -14,10 +14,11 @@ load_dotenv()
 # --- グローバル変数の定義 ---
 db = None
 
+# --- ★★★ここから変更★★★ ---
 # --- 環境変数の読み込みとチェック ---
 FIREBASE_API_KEY = os.getenv("FIREBASE_WEB_API_KEY")
 STORAGE_BUCKET = os.getenv("FIREBASE_STORAGE_BUCKET")
-# ★Stripeと安全なFirebase認証用の変数を追加
+# Stripeと安全なFirebase認証用の変数を追加
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")
 FIREBASE_SERVICE_ACCOUNT_JSON = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")
 
@@ -26,7 +27,7 @@ FIREBASE_SERVICE_ACCOUNT_JSON = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")
 missing_vars = []
 if not FIREBASE_API_KEY: missing_vars.append("FIREBASE_WEB_API_KEY")
 if not STORAGE_BUCKET: missing_vars.append("FIREBASE_STORAGE_BUCKET")
-# ★新しい必須変数をチェックリストに追加
+# 新しい必須変数をチェックリストに追加
 if not STRIPE_SECRET_KEY: missing_vars.append("STRIPE_SECRET_KEY")
 if not FIREBASE_SERVICE_ACCOUNT_JSON: missing_vars.append("FIREBASE_SERVICE_ACCOUNT_JSON")
 
@@ -35,10 +36,10 @@ if missing_vars:
     st.error(f"❌ 必須の環境変数が不足しています: {', '.join(missing_vars)}。Streamlit CloudのSecretsを確認してください。")
     st.stop()
 
-# --- ★APIキーの設定 ---
+# --- APIキーの設定 ---
 stripe.api_key = STRIPE_SECRET_KEY
 
-# --- ★Firebase Admin SDKの初期化 (より安全な方法に変更) ---
+# --- Firebase Admin SDKの初期化 (より安全な方法に変更) ---
 try:
     if not firebase_admin._apps:
         # 環境変数からJSON文字列を読み込み、辞書に変換
@@ -50,8 +51,9 @@ except Exception as e:
     st.error(f"❌ Firebase Admin SDKの初期化に失敗しました。SecretsのFIREBASE_SERVICE_ACCOUNT_JSONを確認してください。")
     st.error(f"エラー詳細: {e}")
     st.stop()
+# --- ★★★ここまで変更★★★ ---
 
-# --- ★Streamlitのセッションステート初期化 (Stripe顧客IDを追加) ---
+# --- Streamlitのセッションステート初期化 (Stripe顧客IDを追加) ---
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.user = None
@@ -78,8 +80,8 @@ def create_user_with_email_and_password(email, password):
     response.raise_for_status()
     return response.json()
 
-# --- ★Firestoreの操作関数 (Stripe連携機能を追加) ---
-
+# --- ★★★ここから変更★★★ ---
+# --- Firestoreの操作関数 (Stripe連携機能を追加) ---
 def get_user_data_from_firestore(uid):
     """
     元の月次リセット機能に、Stripe顧客IDの取得・作成機能を追加。
@@ -117,13 +119,13 @@ def get_user_data_from_firestore(uid):
         st.session_state.plan = data.get("plan", "Free")
         st.session_state.remaining_uses = data.get("remaining_uses", 0)
         
-        # ★Stripe顧客IDを取得。なければ作成する。
+        # Stripe顧客IDを取得。なければ作成する。
         st.session_state.stripe_customer_id = data.get("stripe_customer_id")
         if not st.session_state.stripe_customer_id:
             _create_stripe_customer_and_update_firestore(uid, doc_ref)
 
     else:
-        # ★新規ユーザー作成時にStripe顧客も一緒に作成する
+        # 新規ユーザー作成時にStripe顧客も一緒に作成する
         _create_new_user_in_firestore_and_stripe(uid)
     return True
 
@@ -157,6 +159,7 @@ def _create_new_user_in_firestore_and_stripe(uid):
     except Exception as e:
         st.error(f"新規ユーザーのStripe連携に失敗: {e}")
 
+# --- ★★★ここまで変更★★★ ---
 
 def update_user_uses_in_firestore(uid, uses_to_deduct=1):
     # (この関数はお客様の元のコードのまま、変更ありません)
