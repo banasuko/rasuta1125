@@ -383,16 +383,35 @@ st.markdown(
 st.title("✍️ バナーコピー生成")
 
 # ---------------------------
-# 1) 画像アップロード（任意）
+# プランと残回数の取得
+# ---------------------------
+user_plan = st.session_state.get("plan", "Guest")
+remaining_uses = st.session_state.get("remaining_uses", 0)
+
+# ---------------------------
+# ★★★ Freeプランの期間限定アクセスチェック ★★★
+# ---------------------------
+now = datetime.now()
+is_free_trial_period = (now.year == 2024 and now.month <= 12 and now.day <= 30)
+
+if user_plan == "Free" and not is_free_trial_period:
+    st.warning("Freeプランのコピー生成機能の特典期間は2024年12月30日で終了しました。")
+    st.info("引き続きご利用になるには、Light以上のプランへのアップグレードが必要です。")
+    st.stop()
+elif user_plan == "Guest":
+    st.warning("この機能はGuestプランではご利用いただけません。")
+    st.info("機能をお試しになるには、アカウントを作成してFreeプランをご利用ください。")
+    st.stop()
+
+
+# ---------------------------
+# UI表示
 # ---------------------------
 uploaded_image = st.file_uploader("参考にするバナー画像をアップロード（任意）", type=["jpg", "png"])
 if uploaded_image:
     image = Image.open(uploaded_image)
-    st.image(image, caption="アップロードされた画像", width=300) # 小さめにプレビュー
+    st.image(image, caption="アップロードされた画像", width=300)
 
-# ---------------------------
-# 2) 業種カテゴリ
-# ---------------------------
 category = st.selectbox(
     "業種カテゴリを選択",
     [
@@ -401,9 +420,6 @@ category = st.selectbox(
     ]
 )
 
-# ---------------------------
-# 3) 基本情報
-# ---------------------------
 col1, col2 = st.columns(2)
 with col1:
     target = st.text_input("ターゲット層（例：30代女性、経営者など）")
@@ -411,27 +427,16 @@ with col1:
 with col2:
     feature = st.text_area("商品の特徴・アピールポイント（箇条書きOK）", height=120)
 
-# ---------------------------
-# 4) 生成オプション（UIを拡張）
-# ---------------------------
 st.markdown("### ⚙️ 生成オプション")
 
-# プランと残回数
-user_plan = st.session_state.get("plan", "Guest")
-remaining_uses = st.session_state.get("remaining_uses", 0)
-
-# プラン別 1リクエストあたりの最大生成数
 plan_to_max = {
-    "Free": 0, "Guest": 0,
+    "Free": 1, "Guest": 0,
     "Light": 3, "Pro": 5, "Team": 10, "Enterprise": 10
 }
 max_copy_count_per_request = plan_to_max.get(user_plan, 0)
-if max_copy_count_per_request == 0:
-    copy_count_options = [0]
-else:
-    copy_count_options = list(range(1, max_copy_count_per_request + 1))
+copy_count_options = list(range(1, max_copy_count_per_request + 1)) if max_copy_count_per_request > 0 else [0]
 
-# コピータイプ
+
 st.caption("コピータイプ（複数選択可）")
 type_cols = st.columns(4)
 with type_cols[0]:
@@ -443,22 +448,19 @@ with type_cols[2]:
 with type_cols[3]:
     want_sub = st.checkbox("サブコピー")
 
-# 生成数
 copy_count = st.selectbox(
     f"生成数（各タイプにつき / 上限: {max_copy_count_per_request}案）",
     copy_count_options,
-    index=0 if 0 in copy_count_options else 0,
+    index=0,
     format_func=lambda x: f"{x}パターン" if x > 0 else "—"
 )
 
-# 絵文字 / 緊急性
 opt_cols = st.columns(2)
 with opt_cols[0]:
     include_emoji = st.checkbox("絵文字を含める")
 with opt_cols[1]:
     include_urgency = st.checkbox("緊急性要素を含める（例：期間限定・先着・残りわずか）")
 
-# --- 追加機能 ---
 add_ctr = False
 check_typos = False
 if user_plan not in ["Free", "Guest"]:
@@ -466,42 +468,57 @@ if user_plan not in ["Free", "Guest"]:
         add_ctr = st.checkbox("予想CTRを追加")
         check_typos = st.checkbox("誤字脱字をチェック")
 
-# 投稿文作成ブロック
+# ★★★ 投稿文作成ブロック（プラン別表示） ★★★
 st.markdown("---")
-st.subheader("📝 投稿文作成（任意）")
-enable_caption = st.checkbox("投稿文も作成する")
+enable_caption = False
 caption_lines = 0
 caption_keywords = ""
-if enable_caption:
-    caption_lines = st.selectbox("投稿文の行数", [1, 2, 3, 4, 5], index=2)
-    caption_keywords = st.text_input("任意で含めたいワード（カンマ区切り）", placeholder="例）初回割引, 予約リンク, 土日OK")
+selected_hashtags = []
+
+if user_plan != "Free":
+    st.subheader("📝 投稿文作成（任意）")
+    enable_caption = st.checkbox("投稿文も作成する")
+    if enable_caption:
+        caption_lines = st.selectbox("投稿文の行数", [1, 2, 3, 4, 5], index=2)
+        caption_keywords = st.text_input("任意で含めたいワード（カンマ区切り）", placeholder="例）初回割引, 予約リンク, 土日OK")
+
+        # ★★★ Proプラン向けハッシュタグ機能 ★★★
+        if user_plan == "Pro":
+            st.markdown("##### # ハッシュタグ選択（Proプラン限定）")
+            st.caption("関連性の高いハッシュタグをAIが自動で5個ずつ生成します。")
+            hashtag_cols = st.columns(4)
+            with hashtag_cols[0]:
+                if st.checkbox("業種系", key="ht_cat1"): selected_hashtags.append("業種関連")
+            with hashtag_cols[1]:
+                if st.checkbox("ターゲット系", key="ht_cat2"): selected_hashtags.append("ターゲット層関連")
+            with hashtag_cols[2]:
+                if st.checkbox("訴求系", key="ht_cat3"): selected_hashtags.append("訴求ポイント関連")
+            with hashtag_cols[3]:
+                if st.checkbox("その他", key="ht_cat4"): selected_hashtags.append("その他お悩み・ベネフィット関連")
+
 
 # ---------------------------
-# 5) 生成ボタン
+# プロンプト生成 & 実行
 # ---------------------------
 needs_yakkihou = category in ["脱毛サロン", "エステ", "ホワイトニング"]
 
 def build_prompt():
-    # コピータイプの指示をまとめる
     type_instructions = []
-    if want_main:
-        type_instructions.append(f"- **メインコピー**：{copy_count}案")
-    if want_catch:
-        type_instructions.append(f"- **キャッチコピー**：{copy_count}案")
-    if want_cta:
-        type_instructions.append(f"- **CTAコピー**：{copy_count}案")
-    if want_sub:
-        type_instructions.append(f"- **サブコピー**：{copy_count}案")
+    if want_main: type_instructions.append(f"- **メインコピー**：{copy_count}案")
+    if want_catch: type_instructions.append(f"- **キャッチコピー**：{copy_count}案")
+    if want_cta: type_instructions.append(f"- **CTAコピー**：{copy_count}案")
+    if want_sub: type_instructions.append(f"- **サブコピー**：{copy_count}案")
     if not type_instructions and not enable_caption:
-        return None  # 何も選ばれていない
+        return None
 
     emoji_rule = "・各案に1〜2個の絵文字を自然に入れてください。" if include_emoji else "・絵文字は使用しないでください。"
     urgency_rule = "・必要に応じて『期間限定』『先着順』『残りわずか』などの緊急性フレーズも自然に織り交ぜてください。" if include_urgency else ""
     yakki_rule = "・薬機法/医療広告ガイドラインに抵触する表現は避けてください（例：治る、即効、永久、医療行為の示唆 など）。" if needs_yakkihou else ""
     ctr_rule = "・各コピー案に対して、予想されるクリックスルー率（CTR）をパーセンテージで示してください。" if add_ctr else ""
     typo_rule = "・提案する前に、全てのテキストに誤字脱字がないか厳密に確認してください。" if check_typos else ""
-    
+
     cap_rule = ""
+    hashtags_rule = ""
     if enable_caption and caption_lines > 0:
         cap_rule = f"""
 ### 投稿文作成
@@ -511,10 +528,17 @@ def build_prompt():
 - ハッシュタグは付けない
 - 任意ワードがあれば必ず自然に含める（過剰な羅列は禁止）
 """
+        if selected_hashtags:
+            hashtags_text = "、".join(selected_hashtags)
+            hashtags_rule = f"""
+### ハッシュタグ生成
+- 投稿文の最後に、以下のカテゴリに沿った人気の日本語ハッシュタグを、それぞれ5個ずつ、合計{len(selected_hashtags) * 5}個生成してください。
+- カテゴリ：{hashtags_text}
+- フォーマットは `#タグ #タグ` のように半角スペース区切りで一行にまとめてください。
+"""
 
     keywords_text = f"任意ワード：{caption_keywords}" if caption_keywords else "任意ワード：なし"
 
-    # 最終プロンプト
     return f"""
 あなたは優秀な広告コピーライターです。下記条件に沿って、用途別に日本語で提案してください。出力は**Markdown**で、各セクションに見出しを付け、番号付きリストで返してください。
 
@@ -537,6 +561,7 @@ def build_prompt():
 {os.linesep.join(type_instructions) if type_instructions else '- （コピータイプなし）'}
 
 {cap_rule}
+{hashtags_rule}
 
 ### 追加ガイド
 - **キャッチコピー**：インパクト重視/30字以内目安
@@ -552,23 +577,15 @@ def build_prompt():
 ## メインコピー
 1. 〜 (予想CTR: Z.Z%)
 ...
-
-{ '## 投稿文\n1)\n2)\n...' if enable_caption else '' }
 """
 
 generate_btn = st.button("🚀 コピーを生成する")
 
 if generate_btn:
-    # プランチェック
-    if user_plan in ["Free", "Guest"]:
-        st.warning("この機能はFree/Guestプランではご利用いただけません。Light以上のプランでご利用ください。")
-        st.stop()
-    # ★★★ 残回数チェック（修正） ★★★
     if remaining_uses <= 0:
         st.warning(f"残り回数がありません。（現在プラン：{user_plan}）")
         st.info("利用回数を増やすには、プランのアップグレードが必要です。")
         st.stop()
-    # 生成数チェック
     if copy_count == 0 and not enable_caption:
         st.warning("コピー生成数が0です。少なくとも1案以上を選択するか、投稿文作成を有効にしてください。")
         st.stop()
@@ -580,12 +597,9 @@ if generate_btn:
 
     with st.spinner("コピー案を生成中..."):
         try:
-            # ★★★ 利用回数を1消費（修正） ★★★
             if auth_utils.update_user_uses_in_firestore(st.session_state["user"]):
-                # UI上の残回数も即座に反映
                 st.session_state.remaining_uses -= 1
 
-                # OpenAI へ投げる
                 resp = client.chat.completions.create(
                     model="gpt-4o",
                     messages=[
@@ -596,7 +610,6 @@ if generate_btn:
                 )
                 output = resp.choices[0].message.content.strip()
 
-                # 表示
                 st.subheader("✍️ 生成結果")
                 st.markdown(output)
 
@@ -605,7 +618,5 @@ if generate_btn:
                     st.info("※ このカテゴリでは『治る／即効／永久／医療行為の示唆』などはNG。効能・効果の断定表現も避けましょう。")
             else:
                 st.error("利用回数の更新に失敗しました。")
-
-
         except Exception as e:
             st.error(f"コピー生成中にエラーが発生しました：{e}")
