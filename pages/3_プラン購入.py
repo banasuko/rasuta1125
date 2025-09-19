@@ -12,18 +12,12 @@ auth_utils.check_login()
 # ★★★ 商品ライブラリ ★★★
 # ---------------------------
 # 今後、新しいプランや商品を追加する場合は、このリストに新しい辞書を追加してください。
-# 【辞書のキー説明】
-#   - name: 商品名（例：'Proプラン'）
-#   - price: 価格（表示用テキスト）
-#   - description: 商品説明
-#   - link: Stripeの決済リンクURL
-#   - recommended: Trueにすると「おすすめ！」バッジが付きます
 # ---------------------------
 PRODUCT_LIBRARY = [
     {
         "name": "Lightプラン",
-        "price": "¥2,980 / 月",
-        "description": "広告主や小規模店舗での日常的な運用に最適なプランです。基本的な診断機能に加え、ABテスト診断やCTR予測などの高度な機能も利用できます。",
+        "price": "月額¥1,000",
+        "description": "【3ヶ月間の期間限定価格！】通常月額1,500円のところ、今ならこの価格。広告主や小規模店舗での日常的な運用に最適なプランです。",
         "features": [
             "月間利用回数：50回",
             "ABテスト診断",
@@ -35,7 +29,7 @@ PRODUCT_LIBRARY = [
     },
     {
         "name": "Proプラン",
-        "price": "¥9,800 / 月",
+        "price": "月額¥2,980",
         "description": "広告代理店や制作会社など、本格的に利用したい方向けのプランです。全機能が利用可能で、レポート出力や投稿文生成など、より高度な業務にも対応します。",
         "features": [
             "月間利用回数：200回",
@@ -66,7 +60,6 @@ st.markdown("""
         border: 2px solid rgba(255, 255, 255, 0.2);
         border-radius: 16px;
         padding: 2rem;
-        margin-bottom: 2rem;
         background: rgba(26, 32, 44, 0.6);
         box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
         transition: all 0.3s ease;
@@ -154,10 +147,9 @@ if remaining_uses <= 0:
     )
 
 # 商品ライブラリからプラン一覧を表示
-# 2列表示にする
-columns = st.columns(2)
-col_index = 0
+columns = st.columns(len(PRODUCT_LIBRARY) or [1]) # Handle empty library
 
+col_index = 0
 for product in PRODUCT_LIBRARY:
     with columns[col_index]:
         # st.container() とカスタムCSSクラスでカードを作成
@@ -182,11 +174,9 @@ for product in PRODUCT_LIBRARY:
         )
 
         st.markdown('</div>', unsafe_allow_html=True)
-        # Add some space below the card
-        st.markdown("<br>", unsafe_allow_html=True)
 
     # 次の列へ
-    col_index = (col_index + 1) % 2
+    col_index = (col_index + 1) % len(columns)
 
 
 st.markdown("---")
