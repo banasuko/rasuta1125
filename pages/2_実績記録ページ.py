@@ -1,47 +1,10 @@
 import streamlit as st
 import pandas as pd
+from firestore_client import get_firestore_db
+from datetime import datetime, timedelta
 import auth_utils
 from fpdf import FPDF
-from datetime import datetime
-import os
-
-# ---------------------------
-# PDF生成用のヘルパー関数
-# ---------------------------
-def dataframe_to_pdf(df):
-    pdf = FPDF(orientation='L') # 横向き
-    pdf.add_page()
-    
-    font_path = 'NotoSansJP-Regular.ttf'
-    if not os.path.exists(font_path):
-        st.error(f"日本語フォントファイル '{font_path}' が見つかりません。")
-        return None
-        
-    try:
-        pdf.add_font('NotoSansJP', '', font_path, uni=True)
-        pdf.set_font('NotoSansJP', '', 8)
-    except Exception as e:
-        st.error(f"フォントの読み込み中にエラーが発生しました: {e}")
-        return None
-
-    # ヘッダー
-    for col in df.columns:
-        pdf.cell(35, 10, col, 1, 0, 'C')
-    pdf.ln()
-
-    # データ行
-    for index, row in df.iterrows():
-        # ★★★ ここから変更 ★★★
-        # .items() を使わず、DataFrameの列名を使って順番に値を取得する
-        for col_name in df.columns:
-            item = row[col_name]
-            text = str(item).replace('\n', ' ')
-            pdf.cell(35, 10, text, 1, 0, 'L')
-        # ★★★ ここまで変更 ★★★
-        pdf.ln()
-        
-    return pdf.output(dest='S').encode('latin-1')
-
+import io
 
 # ---------------------------
 # ページ設定 & ログインチェック
@@ -49,104 +12,115 @@ def dataframe_to_pdf(df):
 st.set_page_config(layout="wide", page_title="バナスコAI - 実績記録")
 auth_utils.check_login()
 
-# --- CSS ---
-st.markdown(
-    """
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@300;400;500;600;700&display=swap');
-    
-    .stDataFrame > div > div > div > div > div[data-testid="stDataGridColHeader"] {
-        background-color: rgba(56, 189, 248, 0.2) !important;
-        color: white !important;
-        font-weight: 600 !important;
-    }
-
-    .stDataFrame > div > div > div > div > div[data-testid="stDataGridCell"] {
-        background-color: #1a1c29 !important;
-        color: #FBC02D !important;
-        border-color: rgba(255, 255, 255, 0.2) !important;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+# ---------------------------
+# Firestoreからデータ取得
+# ---------------------------
+def get_user_records(user_id):
+    db = get_firestore_db()
+    records_ref = db.collection('users').document(user_id).collection('records')
+    records = [doc.to_dict() for doc in records_ref.stream()]
+    if not records:
+        return pd.DataFrame()
+    df = pd.DataFrame(records)
+    # タイムスタンプをdatetimeオブジェクトに変換
+    df['timestamp'] = pd.to_datetime(df['timestamp'])
+    return df
 
 # ---------------------------
-# プランによるアクセス制御
+# PDF生成関数
 # ---------------------------
-user_plan = st.session_state.get("plan", "Guest")
+def create_pdf(dataframe):
+    pdf = FPDF()
+    pdf.add_page()
 
-st.title("📊 実績記録ページ")
-st.markdown("過去の診断結果を一覧で確認・編集できます。")
-st.markdown("---")
+    # 日本語フォントを追加
+    # プロジェクトのルートにあるフォントファイルを指定
+    try:
+        pdf.add_font('NotoSansJP', '', 'NotoSansJP-Regular.ttf', uni=True)
+        pdf.set_font('NotoSansJP', '', 10)
+    except Exception as e:
+        # フォント読み込みエラーの代替処理
+        st.warning(f"フォントの読み込みに失敗しました。PDFは標準フォントで生成されます。エラー: {e}")
+        pdf.set_font('Arial', '', 10)
 
-if user_plan not in ["Pro", "Team", "Enterprise"]:
-    st.warning("実績記録ページの閲覧・編集機能はProプラン以上でご利用いただけます。")
-    st.info("プランをアップグレードすると、過去の診断結果を一覧で管理・分析できるようになります。")
+    # ヘッダー
+    col_widths = {'日付': 30, 'カテゴリ': 35, 'ターゲット': 45, '生成コピー': 80}
+    for col_name, width in col_widths.items():
+        pdf.cell(width, 10, col_name, border=1, ln=0, align='C')
+    pdf.ln()
+
+    # データ行
+    for index, row in dataframe.iterrows():
+        # 日付を 'YYYY-MM-DD HH:MM' 形式にフォーマット
+        date_str = row['timestamp'].strftime('%Y-%m-%d %H:%M')
+        
+        # サービスの改行をスペースに置換
+        service_text = row.get('service', 'N/A').replace('\n', ' ')
+
+        # 各セルの高さを揃えるためにMultiCellを使用
+        x_before = pdf.get_x()
+        y_before = pdf.get_y()
+        
+        pdf.multi_cell(col_widths['日付'], 8, date_str, border=1, align='L')
+        pdf.set_xy(x_before + col_widths['日付'], y_before)
+        
+        pdf.multi_cell(col_widths['カテゴリ'], 8, row.get('category', 'N/A'), border=1, align='L')
+        pdf.set_xy(x_before + col_widths['日付'] + col_widths['カテゴリ'], y_before)
+
+        pdf.multi_cell(col_widths['ターゲット'], 8, row.get('target_audience', 'N/A'), border=1, align='L')
+        pdf.set_xy(x_before + col_widths['日付'] + col_widths['カテゴリ'] + col_widths['ターゲット'], y_before)
+
+        pdf.multi_cell(col_widths['生成コピー'], 8, service_text, border=1, align='L')
+        
+    # PDFをバイトデータとして返す
+    return pdf.output(dest='S').encode('latin-1')
+
+
+# ---------------------------
+# メインUI
+# ---------------------------
+st.title("📊 実績記録")
+
+if "user" not in st.session_state or st.session_state["user"] is None:
+    st.warning("ログインしてください。")
     st.stop()
 
-# ---------------------------
-# --- 以下、Proプラン以上のみが表示・実行 ---
-# ---------------------------
-try:
-    records = auth_utils.get_diagnosis_records_from_firestore(st.session_state["user"])
+user_id = st.session_state["user"]["uid"]
+df = get_user_records(user_id)
 
-    if not records:
-        st.info("まだ実績記録がありません。バナー診断ページから採点を行うと自動で記録されます。")
-        st.stop()
+if df.empty:
+    st.info("まだ実績記録はありません。")
+else:
+    # 表示用データフレームの準備
+    display_df = df.copy()
+    display_df = display_df.rename(columns={
+        'timestamp': '日付',
+        'category': 'カテゴリ',
+        'target_audience': 'ターゲット',
+        'service': '生成コピー' # 列名をUIに合わせて変更
+    })
 
-    df = pd.DataFrame(records)
+    # 日付で降順にソート
+    display_df = display_df.sort_values(by='日付', ascending=False)
+    
+    # 日付のフォーマットを 'YYYY-MM-DD HH:MM' に変更
+    display_df['日付'] = display_df['日付'].dt.strftime('%Y-%m-%d %H:%M')
 
-    if 'created_at' in df.columns and not pd.api.types.is_datetime64_any_dtype(df['created_at']):
-        df['created_at'] = df['created_at'].apply(lambda x: x.to_datetime() if hasattr(x, 'to_datetime') else pd.to_datetime(x))
+    # 表示する列を選択
+    display_df = display_df[['日付', 'カテゴリ', 'ターゲット', '生成コピー']]
 
-    desired_order = [
-        "id", "banner_name", "pattern", "score", "comment", "predicted_ctr",
-        "platform", "category", "industry", "age_group", "purpose", "genre",
-        "result", "follower_gain", "memo", "image_url", "created_at"
-    ]
-    existing_cols = [col for col in desired_order if col in df.columns]
-    df_ordered = df[existing_cols]
+    st.dataframe(display_df, use_container_width=True, hide_index=True)
 
-    st.info("💡 各セルをダブルクリックすると内容を編集できます。編集後は下の「変更を保存する」ボタンを押してください。")
-
-    edited_df = st.data_editor(
-        df_ordered,
-        key="diagnosis_editor",
-        num_rows="dynamic",
-        use_container_width=True,
-        column_config={
-            "image_url": st.column_config.ImageColumn("バナー画像", help="クリックで拡大表示"),
-            "created_at": st.column_config.DatetimeColumn("診断日時", format="YYYY/MM/DD HH:mm"),
-            "comment": st.column_config.TextColumn("コメント", width="large"),
-        },
-        height=600
+    # --- PDFダウンロードボタン ---
+    st.markdown("---")
+    
+    # PDF生成
+    pdf_data = create_pdf(display_df)
+    
+    # ダウンロードボタン
+    st.download_button(
+        label="📄 PDFとしてダウンロード",
+        data=pdf_data,
+        file_name=f"実績記録_{datetime.now().strftime('%Y%m%d')}.pdf",
+        mime="application/pdf",
     )
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        if st.button("変更を保存する", type="primary", use_container_width=True):
-            with st.spinner("保存中..."):
-                if auth_utils.save_diagnosis_records_to_firestore(st.session_state["user"], edited_df):
-                    st.success("変更を保存しました！")
-                    st.rerun()
-                else:
-                    st.error("保存に失敗しました。")
-    
-    with col2:
-        df_for_download = edited_df.drop(columns=['id', 'image_url'], errors='ignore')
-        
-        pdf_data = dataframe_to_pdf(df_for_download)
-        if pdf_data:
-            st.download_button(
-                label="📜 PDFでダウンロード",
-                data=pdf_data,
-                file_name=f"banasuko_records_{datetime.now().strftime('%Y%m%d')}.pdf",
-                mime="application/pdf",
-                use_container_width=True
-            )
-
-except Exception as e:
-    st.error(f"データの読み込み中にエラーが発生しました: {e}")
-    st.error("お手数ですが、ページを再読み込みしてください。")
