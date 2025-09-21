@@ -389,10 +389,10 @@ user_plan = st.session_state.get("plan", "Guest")
 remaining_uses = st.session_state.get("remaining_uses", 0)
 
 # ---------------------------
-# ★★★ Freeプランの期間限定アクセスチェック ★★★
+# Freeプランの期間限定アクセスチェック
 # ---------------------------
 now = datetime.now()
-is_free_trial_period = (now.year == 2024 and now.month <= 12 and now.day <= 30)
+is_free_trial_period = (now.year <= 2024 and now.month <= 12 and now.day <= 30)
 
 if user_plan == "Free" and not is_free_trial_period:
     st.warning("Freeプランのコピー生成機能の特典期間は2024年12月30日で終了しました。")
@@ -440,13 +440,13 @@ copy_count_options = list(range(1, max_copy_count_per_request + 1)) if max_copy_
 st.caption("コピータイプ（複数選択可）")
 type_cols = st.columns(4)
 with type_cols[0]:
-    want_main = st.checkbox("メインコピー")
+    want_main = st.checkbox("メインコピー", key="cb_main")
 with type_cols[1]:
-    want_catch = st.checkbox("キャッチコピー", value=True)
+    want_catch = st.checkbox("キャッチコピー", value=True, key="cb_catch")
 with type_cols[2]:
-    want_cta = st.checkbox("CTAコピー")
+    want_cta = st.checkbox("CTAコピー", key="cb_cta")
 with type_cols[3]:
-    want_sub = st.checkbox("サブコピー")
+    want_sub = st.checkbox("サブコピー", key="cb_sub")
 
 copy_count = st.selectbox(
     f"生成数（各タイプにつき / 上限: {max_copy_count_per_request}案）",
@@ -462,13 +462,11 @@ with opt_cols[1]:
     include_urgency = st.checkbox("緊急性要素を含める（例：期間限定・先着・残りわずか）")
 
 add_ctr = False
-check_typos = False
 if user_plan not in ["Free", "Guest"]:
     with st.expander("高度な機能 (Lightプラン以上)"):
         add_ctr = st.checkbox("予想CTRを追加")
-        check_typos = st.checkbox("誤字脱字をチェック")
 
-# ★★★ 投稿文作成ブロック（プラン別表示） ★★★
+# 投稿文作成ブロック（プラン別表示）
 st.markdown("---")
 enable_caption = False
 caption_lines = 0
@@ -482,7 +480,6 @@ if user_plan != "Free":
         caption_lines = st.selectbox("投稿文の行数", [1, 2, 3, 4, 5], index=2)
         caption_keywords = st.text_input("任意で含めたいワード（カンマ区切り）", placeholder="例）初回割引, 予約リンク, 土日OK")
 
-        # ★★★ Proプラン向けハッシュタグ機能 ★★★
         if user_plan == "Pro":
             st.markdown("##### # ハッシュタグ選択（Proプラン限定）")
             st.caption("関連性の高いハッシュタグをAIが自動で5個ずつ生成します。")
@@ -504,10 +501,11 @@ needs_yakkihou = category in ["脱毛サロン", "エステ", "ホワイトニ�
 
 def build_prompt():
     type_instructions = []
-    if want_main: type_instructions.append(f"- **メインコピー**：{copy_count}案")
-    if want_catch: type_instructions.append(f"- **キャッチコピー**：{copy_count}案")
-    if want_cta: type_instructions.append(f"- **CTAコピー**：{copy_count}案")
-    if want_sub: type_instructions.append(f"- **サブコピー**：{copy_count}案")
+    if st.session_state.cb_main: type_instructions.append(f"- **メインコピー**：{copy_count}案")
+    if st.session_state.cb_catch: type_instructions.append(f"- **キャッチコピー**：{copy_count}案")
+    if st.session_state.cb_cta: type_instructions.append(f"- **CTAコピー**：{copy_count}案")
+    if st.session_state.cb_sub: type_instructions.append(f"- **サブコピー**：{copy_count}案")
+
     if not type_instructions and not enable_caption:
         return None
 
@@ -515,18 +513,17 @@ def build_prompt():
     urgency_rule = "・必要に応じて『期間限定』『先着順』『残りわずか』などの緊急性フレーズも自然に織り交ぜてください。" if include_urgency else ""
     yakki_rule = "・薬機法/医療広告ガイドラインに抵触する表現は避けてください（例：治る、即効、永久、医療行為の示唆 など）。" if needs_yakkihou else ""
     ctr_rule = "・各コピー案に対して、予想されるクリックスルー率（CTR）をパーセンテージで示してください。" if add_ctr else ""
-    typo_rule = "・提案する前に、全てのテキストに誤字脱字がないか厳密に確認してください。" if check_typos else ""
 
     cap_rule = ""
     hashtags_rule = ""
     if enable_caption and caption_lines > 0:
         cap_rule = f"""
 ### 投稿文作成
-- 改行で{caption_lines}行の投稿文を作成（行ごとに要点を変えてください）
-- 1行あたり読みやすい長さ（40〜60文字目安）
-- ターゲットとトーンに合わせて自然な日本語
-- ハッシュタグは付けない
-- 任意ワードがあれば必ず自然に含める（過剰な羅列は禁止）
+- 必ず{caption_lines}個の独立した段落（行）で構成してください。各行の終わりでは必ず改行してください。
+- 1行あたり読みやすい長さ（40〜60文字目安）でお願いします。
+- ターゲットとトーンに合わせて自然な日本語で作成してください。
+- ハッシュタグは付けないでください。
+- 任意ワードがあれば必ず自然に含めてください（過剰な羅列は禁止）。
 """
         if selected_hashtags:
             hashtags_text = "、".join(selected_hashtags)
@@ -555,7 +552,6 @@ def build_prompt():
 {urgency_rule}
 {yakki_rule}
 {ctr_rule}
-{typo_rule}
 
 ### 生成対象
 {os.linesep.join(type_instructions) if type_instructions else '- （コピータイプなし）'}
