@@ -440,9 +440,9 @@ copy_count_options = list(range(1, max_copy_count_per_request + 1)) if max_copy_
 st.caption("コピータイプ（複数選択可）")
 type_cols = st.columns(4)
 with type_cols[0]:
-    st.checkbox("メインコピー", key="cb_main")
+    st.checkbox("メインコピー", key="cb_main", value=True)
 with type_cols[1]:
-    st.checkbox("キャッチコピー", value=True, key="cb_catch")
+    st.checkbox("キャッチコピー", key="cb_catch")
 with type_cols[2]:
     st.checkbox("CTAコピー", key="cb_cta")
 with type_cols[3]:
@@ -500,39 +500,67 @@ if user_plan != "Free":
 needs_yakkihou = category in ["脱毛サロン", "エステ", "ホワイトニング"]
 
 def build_prompt():
+    # --- 生成対象のコピータイプを収集 ---
     type_instructions = []
-    if st.session_state.cb_main: type_instructions.append(f"- **メインコピー**：{copy_count}案")
-    if st.session_state.cb_catch: type_instructions.append(f"- **キャッチコピー**：{copy_count}案")
-    if st.session_state.cb_cta: type_instructions.append(f"- **CTAコピー**：{copy_count}案")
-    if st.session_state.cb_sub: type_instructions.append(f"- **サブコピー**：{copy_count}案")
+    selected_types = []
+    if st.session_state.get("cb_main"):
+        type_instructions.append(f"- **メインコピー**：{copy_count}案")
+        selected_types.append("main")
+    if st.session_state.get("cb_catch"):
+        type_instructions.append(f"- **キャッチコピー**：{copy_count}案")
+        selected_types.append("catch")
+    if st.session_state.get("cb_cta"):
+        type_instructions.append(f"- **CTAコピー**：{copy_count}案")
+        selected_types.append("cta")
+    if st.session_state.get("cb_sub"):
+        type_instructions.append(f"- **サブコピー**：{copy_count}案")
+        selected_types.append("sub")
 
     if not type_instructions and not enable_caption:
         return None
 
+    # --- ルール設定 ---
     emoji_rule = "・各案に1〜2個の絵文字を自然に入れてください。" if include_emoji else "・絵文字は使用しないでください。"
     urgency_rule = "・必要に応じて『期間限定』『先着順』『残りわずか』などの緊急性フレーズも自然に織り交ぜてください。" if include_urgency else ""
     yakki_rule = "・薬機法/医療広告ガイドラインに抵触する表現は避けてください（例：治る、即効、永久、医療行為の示唆 など）。" if needs_yakkihou else ""
     ctr_rule = "・各コピー案に対して、予想されるクリックスルー率（CTR）をパーセンテージで示してください。" if add_ctr else ""
 
+    # --- 投稿文の指示 ---
     cap_rule = ""
-    hashtags_rule = ""
     if enable_caption and caption_lines > 0:
         cap_rule = f"""
 ### 投稿文作成
-- 必ず{caption_lines}個の独立した段落（行）で構成してください。各行の終わりでは必ず改行してください。
-- 1行あたり読みやすい長さ（40〜60文字目安）でお願いします。
+- 以下の指示に従い、投稿文を生成してください。
+- 全体で **{caption_lines}個の段落（行）** で構成してください。
+- 各行は独立した内容として、読みやすい長さ（40〜60文字目安）でお願いします。
+- **各行の最後で必ず改行をしてください。**
 - ターゲットとトーンに合わせて自然な日本語で作成してください。
 - ハッシュタグは付けないでください。
 - 任意ワードがあれば必ず自然に含めてください（過剰な羅列は禁止）。
 """
-        if selected_hashtags:
-            hashtags_text = "、".join(selected_hashtags)
-            hashtags_rule = f"""
+
+    # --- ハッシュタグの指示 ---
+    hashtags_rule = ""
+    if selected_hashtags:
+        hashtags_text = "、".join(selected_hashtags)
+        hashtags_rule = f"""
 ### ハッシュタグ生成
 - 投稿文の最後に、以下のカテゴリに沿った人気の日本語ハッシュタグを、それぞれ5個ずつ、合計{len(selected_hashtags) * 5}個生成してください。
 - カテゴリ：{hashtags_text}
 - フォーマットは `#タグ #タグ` のように半角スペース区切りで一行にまとめてください。
 """
+
+    # --- 追加ガイド（選択されたものだけ） ---
+    guide_definitions = {
+        "catch": "- **キャッチコピー**：インパクト重視/30字以内目安",
+        "main": "- **メインコピー**：価値が伝わる説明的コピー/40字前後",
+        "sub": "- **サブコピー**：補足やベネフィット/60字以内",
+        "cta": "- **CTAコピー**：行動喚起/16字以内/明快"
+    }
+    additional_guide = "\n".join([guide_definitions[t] for t in selected_types if t in guide_definitions])
+    if additional_guide:
+        additional_guide = f"### 追加ガイド\n{additional_guide}"
+
 
     keywords_text = f"任意ワード：{caption_keywords}" if caption_keywords else "任意ワード：なし"
 
@@ -544,6 +572,7 @@ def build_prompt():
 【特徴・アピールポイント】{feature or '未指定'}
 【トーン】{tone}
 【{keywords_text}】
+
 【共通ルール】
 - 同じ方向性を避け、毎案ニュアンスを変える
 - 媒体に載せやすい簡潔な文
@@ -554,16 +583,11 @@ def build_prompt():
 {ctr_rule}
 
 ### 生成対象
-{os.linesep.join(type_instructions) if type_instructions else '- （コピータイプなし）'}
+{os.linesep.join(type_instructions) if type_instructions else '- （コピータイプの生成なし）'}
 
 {cap_rule}
 {hashtags_rule}
-
-### 追加ガイド
-- **キャッチコピー**：インパクト重視/30字以内目安
-- **メインコピー**：価値が伝わる説明的コピー/40字前後
-- **サブコピー**：補足やベネフィット/60字以内
-- **CTAコピー**：行動喚起/16字以内/明快
+{additional_guide}
 
 出力フォーマット例：
 ## キャッチコピー
@@ -588,7 +612,7 @@ if generate_btn:
 
     prompt = build_prompt()
     if prompt is None:
-        st.warning("コピータイプが1つも選択されていません。少なくとも1つ選択してください。")
+        st.warning("生成する対象がありません。コピータイプを1つ以上選択するか、投稿文作成を有効にしてください。")
         st.stop()
 
     with st.spinner("コピー案を生成中..."):
@@ -599,7 +623,7 @@ if generate_btn:
                 resp = client.chat.completions.create(
                     model="gpt-4o",
                     messages=[
-                        {"role": "system", "content": "あなたは日本語に精通した広告コピーライターです。マーケ基礎と法規を理解し、簡潔で効果的な表現を作ります。"},
+                        {"role": "system", "content": "あなたは日本語に精通した広告コピーライターです。マーケティング基礎と法規制を理解し、簡潔で効果的な表現を作成します。"},
                         {"role": "user", "content": prompt}
                     ],
                     temperature=0.9,
@@ -609,9 +633,6 @@ if generate_btn:
                 st.subheader("✍️ 生成結果")
                 st.markdown(output)
 
-                if needs_yakkihou:
-                    st.subheader("🔍 薬機法メモ")
-                    st.info("※ このカテゴリでは『治る／即効／永久／医療行為の示唆』などはNG。効能・効果の断定表現も避けましょう。")
             else:
                 st.error("利用回数の更新に失敗しました。")
         except Exception as e:
