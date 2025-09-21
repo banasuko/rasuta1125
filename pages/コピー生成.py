@@ -3,6 +3,7 @@ import os
 from PIL import Image
 from openai import OpenAI
 from datetime import datetime
+import re
 
 import auth_utils  # Firebase 認証/残回数管理
 
@@ -18,6 +19,18 @@ if not openai_api_key:
     st.error("❌ OpenAI APIキーが見つかりませんでした。`.env` を確認してください。")
     st.stop()
 client = OpenAI(api_key=openai_api_key)
+
+# Session Stateの初期化
+if 'select_all_copies' not in st.session_state:
+    st.session_state.select_all_copies = True
+if 'cb_main' not in st.session_state:
+    st.session_state.cb_main = True
+if 'cb_catch' not in st.session_state:
+    st.session_state.cb_catch = True
+if 'cb_cta' not in st.session_state:
+    st.session_state.cb_cta = True
+if 'cb_sub' not in st.session_state:
+    st.session_state.cb_sub = True
 
 # --- Ultimate Professional CSS Theme ---
 st.markdown(
@@ -403,7 +416,6 @@ elif user_plan == "Guest":
     st.info("機能をお試しになるには、アカウントを作成してFreeプランをご利用ください。")
     st.stop()
 
-
 # ---------------------------
 # UI表示
 # ---------------------------
@@ -436,11 +448,19 @@ plan_to_max = {
 max_copy_count_per_request = plan_to_max.get(user_plan, 0)
 copy_count_options = list(range(1, max_copy_count_per_request + 1)) if max_copy_count_per_request > 0 else [0]
 
-
+# --- コピータイプ選択 ---
 st.caption("コピータイプ（複数選択可）")
+if st.button("すべて選択 / 解除", key="toggle_all"):
+    st.session_state.select_all_copies = not st.session_state.select_all_copies
+    st.session_state.cb_main = st.session_state.select_all_copies
+    st.session_state.cb_catch = st.session_state.select_all_copies
+    st.session_state.cb_cta = st.session_state.select_all_copies
+    st.session_state.cb_sub = st.session_state.select_all_copies
+
+
 type_cols = st.columns(4)
 with type_cols[0]:
-    st.checkbox("メインコピー", key="cb_main", value=True)
+    st.checkbox("メインコピー", key="cb_main")
 with type_cols[1]:
     st.checkbox("キャッチコピー", key="cb_catch")
 with type_cols[2]:
@@ -449,15 +469,15 @@ with type_cols[3]:
     st.checkbox("サブコピー", key="cb_sub")
 
 copy_count = st.selectbox(
-    f"生成数（各タイプにつき / 上限: {max_copy_count_per_request}案）",
+    f"生成数（各コピータイプにつき / 上限: {max_copy_count_per_request}案）",
     copy_count_options,
-    index=0,
+    index=0 if not copy_count_options or copy_count_options[0] == 0 else len(copy_count_options) - 1, # デフォルトを最大値に
     format_func=lambda x: f"{x}パターン" if x > 0 else "—"
 )
 
 opt_cols = st.columns(2)
 with opt_cols[0]:
-    include_emoji = st.checkbox("絵文字を含める")
+    include_emoji = st.checkbox("絵文字を含める", value=True)
 with opt_cols[1]:
     include_urgency = st.checkbox("緊急性要素を含める（例：期間限定・先着・残りわずか）")
 
@@ -466,7 +486,7 @@ if user_plan not in ["Free", "Guest"]:
     with st.expander("高度な機能 (Lightプラン以上)"):
         add_ctr = st.checkbox("予想CTRを追加")
 
-# 投稿文作成ブロック（プラン別表示）
+# --- 投稿文作成ブロック ---
 st.markdown("---")
 enable_caption = False
 caption_lines = 0
@@ -475,9 +495,9 @@ selected_hashtags = []
 
 if user_plan != "Free":
     st.subheader("📝 投稿文作成（任意）")
-    enable_caption = st.checkbox("投稿文も作成する")
+    enable_caption = st.checkbox("投稿文も作成する", value=True)
     if enable_caption:
-        caption_lines = st.selectbox("投稿文の行数", [1, 2, 3, 4, 5], index=2)
+        caption_lines = st.selectbox("投稿文1つあたりの行数", [3, 4, 5, 6, 7], index=0)
         caption_keywords = st.text_input("任意で含めたいワード（カンマ区切り）", placeholder="例）初回割引, 予約リンク, 土日OK")
 
         if user_plan == "Pro":
@@ -500,46 +520,43 @@ if user_plan != "Free":
 needs_yakkihou = category in ["脱毛サロン", "エステ", "ホワイトニング"]
 
 def build_prompt():
-    # --- 生成対象のコピータイプを収集 ---
     type_instructions = []
     selected_types = []
-    if st.session_state.get("cb_main"):
-        type_instructions.append(f"- **メインコピー**：{copy_count}案")
+    if st.session_state.cb_main:
+        type_instructions.append(f"- **メインコピー**: {copy_count}案")
         selected_types.append("main")
-    if st.session_state.get("cb_catch"):
-        type_instructions.append(f"- **キャッチコピー**：{copy_count}案")
+    if st.session_state.cb_catch:
+        type_instructions.append(f"- **キャッチコピー**: {copy_count}案")
         selected_types.append("catch")
-    if st.session_state.get("cb_cta"):
-        type_instructions.append(f"- **CTAコピー**：{copy_count}案")
+    if st.session_state.cb_cta:
+        type_instructions.append(f"- **CTAコピー**: {copy_count}案")
         selected_types.append("cta")
-    if st.session_state.get("cb_sub"):
-        type_instructions.append(f"- **サブコピー**：{copy_count}案")
+    if st.session_state.cb_sub:
+        type_instructions.append(f"- **サブコピー**: {copy_count}案")
         selected_types.append("sub")
 
     if not type_instructions and not enable_caption:
         return None
 
-    # --- ルール設定 ---
     emoji_rule = "・各案に1〜2個の絵文字を自然に入れてください。" if include_emoji else "・絵文字は使用しないでください。"
     urgency_rule = "・必要に応じて『期間限定』『先着順』『残りわずか』などの緊急性フレーズも自然に織り交ぜてください。" if include_urgency else ""
-    yakki_rule = "・薬機法/医療広告ガイドラインに抵触する表現は避けてください（例：治る、即効、永久、医療行為の示唆 など）。" if needs_yakkihou else ""
+    yakki_rule = "・薬機法/医療広告ガイドラインに抵触する表現（例：治る, 即効, 永久, 医療行為の示唆など）は絶対に避けてください。" if needs_yakkihou else ""
     ctr_rule = "・各コピー案に対して、予想されるクリックスルー率（CTR）をパーセンテージで示してください。" if add_ctr else ""
 
-    # --- 投稿文の指示 ---
     cap_rule = ""
     if enable_caption and caption_lines > 0:
         cap_rule = f"""
 ### 投稿文作成
-- 以下の指示に従い、投稿文を生成してください。
-- 全体で **{caption_lines}個の段落（行）** で構成してください。
-- 各行は独立した内容として、読みやすい長さ（40〜60文字目安）でお願いします。
-- **各行の最後で必ず改行をしてください。**
+- 以下の指示に厳密に従い、**3パターンの**投稿文を生成してください。
+- 各パターンは、必ず**{caption_lines}個の独立した段落（行）**で構成してください。
+- **指示された行数を省略したり、追加したりすることは絶対に禁止です。**
+- 各行は読みやすい長さ（40〜60文字目安）でお願いします。
 - ターゲットとトーンに合わせて自然な日本語で作成してください。
 - ハッシュタグは付けないでください。
-- 任意ワードがあれば必ず自然に含めてください（過剰な羅列は禁止）。
+- 任意ワードがあれば必ず自然に含めてください。
+- 3つのパターンはそれぞれ異なる切り口や表現にしてください。
 """
 
-    # --- ハッシュタグの指示 ---
     hashtags_rule = ""
     if selected_hashtags:
         hashtags_text = "、".join(selected_hashtags)
@@ -549,29 +566,30 @@ def build_prompt():
 - カテゴリ：{hashtags_text}
 - フォーマットは `#タグ #タグ` のように半角スペース区切りで一行にまとめてください。
 """
-
-    # --- 追加ガイド（選択されたものだけ） ---
+    
     guide_definitions = {
-        "catch": "- **キャッチコピー**：インパクト重視/30字以内目安",
-        "main": "- **メインコピー**：価値が伝わる説明的コピー/40字前後",
-        "sub": "- **サブコピー**：補足やベネフィット/60字以内",
-        "cta": "- **CTAコピー**：行動喚起/16字以内/明快"
+        "catch": "- **キャッチコピー**: インパクト重視/30字以内目安",
+        "main": "- **メインコピー**: 価値が伝わる説明的コピー/40字前後",
+        "sub": "- **サブコピー**: 補足やベネフィット/60字以内",
+        "cta": "- **CTAコピー**: 行動喚起/16字以内/明快"
     }
     additional_guide = "\n".join([guide_definitions[t] for t in selected_types if t in guide_definitions])
     if additional_guide:
         additional_guide = f"### 追加ガイド\n{additional_guide}"
 
-
     keywords_text = f"任意ワード：{caption_keywords}" if caption_keywords else "任意ワード：なし"
 
     return f"""
-あなたは優秀な広告コピーライターです。下記条件に沿って、用途別に日本語で提案してください。出力は**Markdown**で、各セクションに見出しを付け、番号付きリストで返してください。
+あなたは優秀な広告コピーライターです。下記条件に厳密に従って、日本語で提案してください。出力は**Markdown**で、各セクションに見出しを付け、番号付きリストで返してください。
 
 【業種】{category}
 【ターゲット層】{target or '未指定'}
 【特徴・アピールポイント】{feature or '未指定'}
 【トーン】{tone}
 【{keywords_text}】
+
+【最重要ルール】
+- **未選択のコピータイプは、絶対に生成しないでください。**
 
 【共通ルール】
 - 同じ方向性を避け、毎案ニュアンスを変える
@@ -594,8 +612,15 @@ def build_prompt():
 1. 〜 (予想CTR: X.X%)
 2. 〜 (予想CTR: Y.Y%)
 
-## メインコピー
-1. 〜 (予想CTR: Z.Z%)
+## 投稿文
+### パターン1
+（ここに{caption_lines}行の文章）
+
+### パターン2
+（ここに{caption_lines}行の文章）
+
+### パターン3
+（ここに{caption_lines}行の文章）
 ...
 """
 
@@ -623,7 +648,7 @@ if generate_btn:
                 resp = client.chat.completions.create(
                     model="gpt-4o",
                     messages=[
-                        {"role": "system", "content": "あなたは日本語に精通した広告コピーライターです。マーケティング基礎と法規制を理解し、簡潔で効果的な表現を作成します。"},
+                        {"role": "system", "content": "あなたは日本語に精通した広告コピーライターです。マーケティング基礎と法規制を理解し、簡潔で効果的な表現を作成します。与えられた指示に厳密に従ってください。"},
                         {"role": "user", "content": prompt}
                     ],
                     temperature=0.9,
@@ -633,6 +658,8 @@ if generate_btn:
                 st.subheader("✍️ 生成結果")
                 st.markdown(output)
 
+                if needs_yakkihou:
+                    st.info("💡 **薬機法に関する注意**：このカテゴリでは『治る／即効／永久』といった断定的な表現や、医療行為と誤解される可能性のある表現は避ける必要があります。生成されたコピーも最終的にご自身でご確認ください。")
             else:
                 st.error("利用回数の更新に失敗しました。")
         except Exception as e:
