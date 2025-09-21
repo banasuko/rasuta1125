@@ -440,13 +440,13 @@ copy_count_options = list(range(1, max_copy_count_per_request + 1)) if max_copy_
 st.caption("コピータイプ（複数選択可）")
 type_cols = st.columns(4)
 with type_cols[0]:
-    want_main = st.checkbox("メインコピー", key="cb_main")
+    st.checkbox("メインコピー", key="cb_main")
 with type_cols[1]:
-    want_catch = st.checkbox("キャッチコピー", value=True, key="cb_catch")
+    st.checkbox("キャッチコピー", value=True, key="cb_catch")
 with type_cols[2]:
-    want_cta = st.checkbox("CTAコピー", key="cb_cta")
+    st.checkbox("CTAコピー", key="cb_cta")
 with type_cols[3]:
-    want_sub = st.checkbox("サブコピー", key="cb_sub")
+    st.checkbox("サブコピー", key="cb_sub")
 
 copy_count = st.selectbox(
     f"生成数（各タイプにつき / 上限: {max_copy_count_per_request}案）",
