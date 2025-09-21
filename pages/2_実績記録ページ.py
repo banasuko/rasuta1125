@@ -1,10 +1,17 @@
 import streamlit as st
 import pandas as pd
-from firestore_client import get_firestore_db
-from datetime import datetime, timedelta
-import auth_utils
+import sys
+import os
+from datetime import datetime
 from fpdf import FPDF
-import io
+
+# --- プロジェクトのルートディレクトリをPythonのパスに追加 ---
+# これにより、別階層にある firestore_client を正しくインポートできる
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# ---------------------------------------------------------
+
+from firestore_client import get_firestore_db
+import auth_utils
 
 # ---------------------------
 # ページ設定 & ログインチェック
@@ -15,6 +22,7 @@ auth_utils.check_login()
 # ---------------------------
 # Firestoreからデータ取得
 # ---------------------------
+@st.cache_data(ttl=300) # 5分間キャッシュ
 def get_user_records(user_id):
     db = get_firestore_db()
     records_ref = db.collection('users').document(user_id).collection('records')
@@ -23,7 +31,8 @@ def get_user_records(user_id):
         return pd.DataFrame()
     df = pd.DataFrame(records)
     # タイムスタンプをdatetimeオブジェクトに変換
-    df['timestamp'] = pd.to_datetime(df['timestamp'])
+    if 'timestamp' in df.columns:
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
     return df
 
 # ---------------------------
@@ -34,13 +43,15 @@ def create_pdf(dataframe):
     pdf.add_page()
 
     # 日本語フォントを追加
-    # プロジェクトのルートにあるフォントファイルを指定
+    font_path = os.path.join(os.path.dirname(__file__), '..', 'NotoSansJP-Regular.ttf')
     try:
-        pdf.add_font('NotoSansJP', '', 'NotoSansJP-Regular.ttf', uni=True)
-        pdf.set_font('NotoSansJP', '', 10)
+        if os.path.exists(font_path):
+            pdf.add_font('NotoSansJP', '', font_path, uni=True)
+            pdf.set_font('NotoSansJP', '', 10)
+        else:
+            raise FileNotFoundError("フォントファイルが見つかりません。")
     except Exception as e:
-        # フォント読み込みエラーの代替処理
-        st.warning(f"フォントの読み込みに失敗しました。PDFは標準フォントで生成されます。エラー: {e}")
+        st.warning(f"日本語フォントの読み込みに失敗しました。PDFは標準フォントで生成されます。エラー: {e}")
         pdf.set_font('Arial', '', 10)
 
     # ヘッダー
@@ -51,27 +62,27 @@ def create_pdf(dataframe):
 
     # データ行
     for index, row in dataframe.iterrows():
-        # 日付を 'YYYY-MM-DD HH:MM' 形式にフォーマット
-        date_str = row['timestamp'].strftime('%Y-%m-%d %H:%M')
-        
-        # サービスの改行をスペースに置換
-        service_text = row.get('service', 'N/A').replace('\n', ' ')
+        date_str = row.get('日付', 'N/A')
+        category_str = row.get('カテゴリ', 'N/A')
+        target_str = row.get('ターゲット', 'N/A')
+        # PDFでは改行が問題になることがあるため、スペースに置換
+        service_text = str(row.get('生成コピー', 'N/A')).replace('\n', ' ')
 
         # 各セルの高さを揃えるためにMultiCellを使用
         x_before = pdf.get_x()
         y_before = pdf.get_y()
-        
-        pdf.multi_cell(col_widths['日付'], 8, date_str, border=1, align='L')
+
+        pdf.multi_cell(col_widths['日付'], 8, date_str, border='LRB', align='L')
         pdf.set_xy(x_before + col_widths['日付'], y_before)
-        
-        pdf.multi_cell(col_widths['カテゴリ'], 8, row.get('category', 'N/A'), border=1, align='L')
+
+        pdf.multi_cell(col_widths['カテゴリ'], 8, category_str, border='RB', align='L')
         pdf.set_xy(x_before + col_widths['日付'] + col_widths['カテゴリ'], y_before)
 
-        pdf.multi_cell(col_widths['ターゲット'], 8, row.get('target_audience', 'N/A'), border=1, align='L')
+        pdf.multi_cell(col_widths['ターゲット'], 8, target_str, border='RB', align='L')
         pdf.set_xy(x_before + col_widths['日付'] + col_widths['カテゴリ'] + col_widths['ターゲット'], y_before)
 
-        pdf.multi_cell(col_widths['生成コピー'], 8, service_text, border=1, align='L')
-        
+        pdf.multi_cell(col_widths['生成コピー'], 8, service_text, border='RB', align='L')
+
     # PDFをバイトデータとして返す
     return pdf.output(dest='S').encode('latin-1')
 
@@ -97,14 +108,15 @@ else:
         'timestamp': '日付',
         'category': 'カテゴリ',
         'target_audience': 'ターゲット',
-        'service': '生成コピー' # 列名をUIに合わせて変更
+        'service': '生成コピー'
     })
 
     # 日付で降順にソート
     display_df = display_df.sort_values(by='日付', ascending=False)
-    
+
     # 日付のフォーマットを 'YYYY-MM-DD HH:MM' に変更
-    display_df['日付'] = display_df['日付'].dt.strftime('%Y-%m-%d %H:%M')
+    if '日付' in display_df.columns:
+        display_df['日付'] = display_df['日付'].dt.strftime('%Y-%m-%d %H:%M')
 
     # 表示する列を選択
     display_df = display_df[['日付', 'カテゴリ', 'ターゲット', '生成コピー']]
@@ -113,11 +125,9 @@ else:
 
     # --- PDFダウンロードボタン ---
     st.markdown("---")
-    
-    # PDF生成
+
     pdf_data = create_pdf(display_df)
-    
-    # ダウンロードボタン
+
     st.download_button(
         label="📄 PDFとしてダウンロード",
         data=pdf_data,
