@@ -1,4 +1,13 @@
 import streamlit as st
+import sys
+import os
+
+# --- ▼▼▼ このブロックを追加 ▼▼▼ ---
+# プロジェクトのルートディレクトリをPythonのパスに追加
+# これにより、別階層にある auth_utils を正しくインポートできる
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# --- ▲▲▲ このブロックを追加 ▲▲▲ ---
+
 import auth_utils
 
 # ---------------------------
