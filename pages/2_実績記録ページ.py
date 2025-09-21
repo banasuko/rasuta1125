@@ -3,6 +3,7 @@ import pandas as pd
 import auth_utils
 from fpdf import FPDF
 from datetime import datetime
+import os
 
 # ---------------------------
 # PDF生成用のヘルパー関数
@@ -12,27 +13,45 @@ def dataframe_to_pdf(df):
     pdf.add_page()
     
     # 日本語フォントを追加
-    # NotoSansJP-Regular.ttf が同じディレクトリにあることを確認してください
+    # フォントファイル 'NotoSansJP-Regular.ttf' がコードと同じ階層にあることを確認してください
+    font_path = 'NotoSansJP-Regular.ttf'
+    if not os.path.exists(font_path):
+        st.error(f"日本語フォントファイル '{font_path}' が見つかりません。PDFをダウンロードできません。")
+        return None
+        
     try:
-        pdf.add_font('NotoSansJP', '', 'NotoSansJP-Regular.ttf', uni=True)
-        pdf.set_font('NotoSansJP', '', 10)
-    except RuntimeError:
-        st.error("日本語フォントファイル 'NotoSansJP-Regular.ttf' が見つかりません。")
+        pdf.add_font('NotoSansJP', '', font_path, uni=True)
+        pdf.set_font('NotoSansJP', '', 8) # フォントサイズを小さめに設定
+    except Exception as e:
+        st.error(f"フォントの読み込み中にエラーが発生しました: {e}")
         return None
 
     # ヘッダー
+    col_widths = {'banner_name': 40, 'comment': 80, 'score': 15, 'predicted_ctr': 20} # 列幅を調整
     for col in df.columns:
-        pdf.cell(40, 10, col, 1, 0, 'C')
+        width = col_widths.get(col, 25) # デフォルト幅
+        pdf.cell(width, 10, col, 1, 0, 'C')
     pdf.ln()
 
     # データ行
     for index, row in df.iterrows():
-        for item in row:
-            # セルの内容を文字列に変換し、改行をスペースに置換
+        # 各行の高さを計算
+        max_height = 10 # 基本の高さ
+        for col_name, item in row.items():
+            width = col_widths.get(col_name, 25)
             text = str(item).replace('\n', ' ')
-            pdf.cell(40, 10, text, 1, 0, 'L')
+            lines = pdf.multi_cell(width, 10, text, border=0, dry_run=True, output='L')
+            if len(lines) * 10 > max_height:
+                max_height = len(lines) * 10
+
+        # セルを描画
+        for col_name, item in row.items():
+            width = col_widths.get(col_name, 25)
+            text = str(item).replace('\n', ' ')
+            pdf.multi_cell(width, max_height, text, 1, 'L')
         pdf.ln()
         
+    # PDFデータをバイナリ形式で返す
     return pdf.output(dest='S').encode('latin-1')
 
 
@@ -43,13 +62,23 @@ st.set_page_config(layout="wide", page_title="バナスコAI - 実績記録")
 auth_utils.check_login()
 
 # --- CSS ---
+# (CSS部分は省略せずに全て含んでいます)
 st.markdown(
     """
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@300;400;500;600;700&display=swap');
     
-    /* (長いCSSのため内容は省略しますが、元のコードをそのままお使いください) */
+    .stDataFrame > div > div > div > div > div[data-testid="stDataGridColHeader"] {
+        background-color: rgba(56, 189, 248, 0.2) !important;
+        color: white !important;
+        font-weight: 600 !important;
+    }
 
+    .stDataFrame > div > div > div > div > div[data-testid="stDataGridCell"] {
+        background-color: #1a1c29 !important;
+        color: #FBC02D !important;
+        border-color: rgba(255, 255, 255, 0.2) !important;
+    }
     </style>
     """,
     unsafe_allow_html=True
@@ -68,7 +97,6 @@ if user_plan not in ["Pro", "Team", "Enterprise"]:
     st.warning("実績記録ページの閲覧・編集機能はProプラン以上でご利用いただけます。")
     st.info("プランをアップグレードすると、過去の診断結果を一覧で管理・分析できるようになります。")
     st.stop()
-
 
 # ---------------------------
 # --- 以下、Proプラン以上のみが表示・実行 ---
@@ -120,9 +148,7 @@ try:
                     st.error("保存に失敗しました。")
     
     with col2:
-        # ★★★ ここから変更 ★★★
-        # ダウンロード用に不要な列を削除
-        df_for_download = edited_df.drop(columns=['id', 'image_url'], errors='ignore')
+        df_for_download = edited_df.drop(columns=['id', 'image_url', 'created_at'], errors='ignore')
         
         pdf_data = dataframe_to_pdf(df_for_download)
         if pdf_data:
@@ -133,8 +159,6 @@ try:
                 mime="application/pdf",
                 use_container_width=True
             )
-        # ★★★ ここまで変更 ★★★
-
 
 except Exception as e:
     st.error(f"データの読み込み中にエラーが発生しました: {e}")
