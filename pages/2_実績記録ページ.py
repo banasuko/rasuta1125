@@ -9,13 +9,12 @@ import os
 # PDF生成用のヘルパー関数
 # ---------------------------
 def dataframe_to_pdf(df):
-    pdf = FPDF(orientation='L') # 横向きに変更
+    pdf = FPDF(orientation='L') # 横向き
     pdf.add_page()
     
-    # 日本語フォントを追加
     font_path = 'NotoSansJP-Regular.ttf'
     if not os.path.exists(font_path):
-        st.error(f"日本語フォントファイル '{font_path}' が見つかりません。PDFをダウンロードできません。")
+        st.error(f"日本語フォントファイル '{font_path}' が見つかりません。")
         return None
         
     try:
@@ -26,17 +25,19 @@ def dataframe_to_pdf(df):
         return None
 
     # ヘッダー
-    # DataFrameに存在する列のみをヘッダーとして描画
     for col in df.columns:
         pdf.cell(35, 10, col, 1, 0, 'C')
     pdf.ln()
 
     # データ行
     for index, row in df.iterrows():
-        for col_name in df.columns: # DataFrameの列順に処理
-            item = row.get(col_name, "") # データが存在しない場合は空文字を使用
+        # ★★★ ここから変更 ★★★
+        # .items() を使わず、DataFrameの列名を使って順番に値を取得する
+        for col_name in df.columns:
+            item = row[col_name]
             text = str(item).replace('\n', ' ')
             pdf.cell(35, 10, text, 1, 0, 'L')
+        # ★★★ ここまで変更 ★★★
         pdf.ln()
         
     return pdf.output(dest='S').encode('latin-1')
@@ -134,7 +135,6 @@ try:
                     st.error("保存に失敗しました。")
     
     with col2:
-        # PDFダウンロード用に、表示されている列のみを対象にする
         df_for_download = edited_df.drop(columns=['id', 'image_url'], errors='ignore')
         
         pdf_data = dataframe_to_pdf(df_for_download)
