@@ -5,10 +5,11 @@ import os
 from datetime import datetime
 from fpdf import FPDF
 
-# --- プロジェクトのルートディレクトリをPythonのパスに追加 ---
-# これにより、別階層にある firestore_client を正しくインポートできる
+# --- ▼▼▼ このブロックを追加 ▼▼▼ ---
+# プロジェクトのルートディレクトリをPythonのパスに追加
+# これにより、別階層にあるファイルを正しくインポートできる
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-# ---------------------------------------------------------
+# --- ▲▲▲ このブロックを追加 ▲▲▲ ---
 
 from firestore_client import get_firestore_db
 import auth_utils
@@ -112,10 +113,9 @@ else:
     })
 
     # 日付で降順にソート
-    display_df = display_df.sort_values(by='日付', ascending=False)
-
-    # 日付のフォーマットを 'YYYY-MM-DD HH:MM' に変更
     if '日付' in display_df.columns:
+        display_df = display_df.sort_values(by='日付', ascending=False)
+        # 日付のフォーマットを 'YYYY-MM-DD HH:MM' に変更
         display_df['日付'] = display_df['日付'].dt.strftime('%Y-%m-%d %H:%M')
 
     # 表示する列を選択
