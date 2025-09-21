@@ -432,13 +432,15 @@ if uploaded_image:
     image = Image.open(uploaded_image)
     st.image(image, caption="アップロードされた画像", width=300)
 
+# --- ▼▼▼ 変更点: 業種カテゴリに「不動産」を追加 ▼▼▼ ---
 category = st.selectbox(
     "業種カテゴリを選択",
     [
         "美容室", "脱毛サロン", "エステ", "ネイル・まつげ", "ホワイトニング",
-        "整体・接骨院", "学習塾", "子ども写真館", "飲食店", "その他"
+        "整体・接骨院", "学習塾", "子ども写真館", "飲食店", "不動産", "その他"
     ]
 )
+# --- ▲▲▲ 変更点ここまで ▲▲▲ ---
 
 col1, col2 = st.columns(2)
 with col1:
@@ -457,12 +459,21 @@ max_copy_count_per_request = plan_to_max.get(user_plan, 0)
 copy_count_options = list(range(1, max_copy_count_per_request + 1)) if max_copy_count_per_request > 0 else [0]
 
 
+# --- コピータイプ選択のUI ---
 st.caption("コピータイプ（複数選択可）")
+
+if st.button("すべて選択 / 解除"):
+    st.session_state.select_all_copies = not st.session_state.select_all_copies
+    st.session_state.cb_main = st.session_state.select_all_copies
+    st.session_state.cb_catch = st.session_state.select_all_copies
+    st.session_state.cb_cta = st.session_state.select_all_copies
+    st.session_state.cb_sub = st.session_state.select_all_copies
+
 type_cols = st.columns(4)
 with type_cols[0]:
     st.checkbox("メインコピー", key="cb_main")
 with type_cols[1]:
-    st.checkbox("キャッチコピー", value=True, key="cb_catch")
+    st.checkbox("キャッチコピー", key="cb_catch")
 with type_cols[2]:
     st.checkbox("CTAコピー", key="cb_cta")
 with type_cols[3]:
@@ -486,7 +497,7 @@ if user_plan not in ["Free", "Guest"]:
     with st.expander("高度な機能 (Lightプラン以上)"):
         add_ctr = st.checkbox("予想CTRを追加")
 
-# 投稿文作成ブロック（プラン別表示）
+# --- 投稿文作成のUI ---
 st.markdown("---")
 enable_caption = False
 caption_lines = 0
@@ -495,9 +506,9 @@ selected_hashtags = []
 
 if user_plan != "Free":
     st.subheader("📝 投稿文作成（任意）")
-    enable_caption = st.checkbox("投稿文も作成する")
+    enable_caption = st.checkbox("投稿文も作成する（3パターン生成）")
     if enable_caption:
-        caption_lines = st.selectbox("投稿文の行数", [1, 2, 3, 4, 5], index=2)
+        caption_lines = st.selectbox("投稿文の行数", [3, 4, 5], index=0)
         caption_keywords = st.text_input("任意で含めたいワード（カンマ区切り）", placeholder="例）初回割引, 予約リンク, 土日OK")
 
         if user_plan == "Pro":
@@ -539,7 +550,9 @@ def build_prompt():
     if enable_caption and caption_lines > 0:
         cap_rule = f"""
 ### 投稿文作成
-- 必ず{caption_lines}個の独立した段落（行）で構成してください。各行の終わりでは必ず改行してください。
+- **必ず3パターンの投稿文を生成してください。**
+- 各パターンは、**必ず{caption_lines}個の独立した段落（行）で構成してください。** 行数を増やしたり減らしたりすることは絶対に禁止です。
+- 各行の終わりでは必ず改行してください。
 - 1行あたり読みやすい長さ（40〜60文字目安）でお願いします。
 - ターゲットとトーンに合わせて自然な日本語で作成してください。
 - ハッシュタグは付けないでください。
@@ -555,6 +568,11 @@ def build_prompt():
 """
 
     keywords_text = f"任意ワード：{caption_keywords}" if caption_keywords else "任意ワード：なし"
+    
+    copy_generation_rule = "下記「生成対象」で指定されたコピータイプのみを生成してください。指定のないコピータイプは絶対に出力しないでください。"
+    if not type_instructions:
+        copy_generation_rule = "コピータイプの生成は不要です。"
+
 
     return f"""
 あなたは優秀な広告コピーライターです。下記条件に沿って、用途別に日本語で提案してください。出力は**Markdown**で、各セクションに見出しを付け、番号付きリストで返してください。
@@ -572,9 +590,10 @@ def build_prompt():
 {urgency_rule}
 {yakki_rule}
 {ctr_rule}
+- {copy_generation_rule}
 
 ### 生成対象
-{os.linesep.join(type_instructions) if type_instructions else '- （コピータイプなし）'}
+{os.linesep.join(type_instructions) if type_instructions else '- （コピータイプの生成なし）'}
 
 {cap_rule}
 {hashtags_rule}
@@ -608,7 +627,7 @@ if generate_btn:
 
     prompt = build_prompt()
     if prompt is None:
-        st.warning("コピータイプが1つも選択されていません。少なくとも1つ選択してください。")
+        st.warning("コピータイプが1つも選択されていない、かつ投稿文作成も無効です。少なくともどちらか一方を有効にしてください。")
         st.stop()
 
     with st.spinner("コピー案を生成中..."):
