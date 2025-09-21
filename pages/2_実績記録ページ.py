@@ -9,11 +9,10 @@ import os
 # PDF生成用のヘルパー関数
 # ---------------------------
 def dataframe_to_pdf(df):
-    pdf = FPDF()
+    pdf = FPDF(orientation='L') # 横向きに変更
     pdf.add_page()
     
     # 日本語フォントを追加
-    # フォントファイル 'NotoSansJP-Regular.ttf' がコードと同じ階層にあることを確認してください
     font_path = 'NotoSansJP-Regular.ttf'
     if not os.path.exists(font_path):
         st.error(f"日本語フォントファイル '{font_path}' が見つかりません。PDFをダウンロードできません。")
@@ -21,37 +20,25 @@ def dataframe_to_pdf(df):
         
     try:
         pdf.add_font('NotoSansJP', '', font_path, uni=True)
-        pdf.set_font('NotoSansJP', '', 8) # フォントサイズを小さめに設定
+        pdf.set_font('NotoSansJP', '', 8)
     except Exception as e:
         st.error(f"フォントの読み込み中にエラーが発生しました: {e}")
         return None
 
     # ヘッダー
-    col_widths = {'banner_name': 40, 'comment': 80, 'score': 15, 'predicted_ctr': 20} # 列幅を調整
+    # DataFrameに存在する列のみをヘッダーとして描画
     for col in df.columns:
-        width = col_widths.get(col, 25) # デフォルト幅
-        pdf.cell(width, 10, col, 1, 0, 'C')
+        pdf.cell(35, 10, col, 1, 0, 'C')
     pdf.ln()
 
     # データ行
     for index, row in df.iterrows():
-        # 各行の高さを計算
-        max_height = 10 # 基本の高さ
-        for col_name, item in row.items():
-            width = col_widths.get(col_name, 25)
+        for col_name in df.columns: # DataFrameの列順に処理
+            item = row.get(col_name, "") # データが存在しない場合は空文字を使用
             text = str(item).replace('\n', ' ')
-            lines = pdf.multi_cell(width, 10, text, border=0, dry_run=True, output='L')
-            if len(lines) * 10 > max_height:
-                max_height = len(lines) * 10
-
-        # セルを描画
-        for col_name, item in row.items():
-            width = col_widths.get(col_name, 25)
-            text = str(item).replace('\n', ' ')
-            pdf.multi_cell(width, max_height, text, 1, 'L')
+            pdf.cell(35, 10, text, 1, 0, 'L')
         pdf.ln()
         
-    # PDFデータをバイナリ形式で返す
     return pdf.output(dest='S').encode('latin-1')
 
 
@@ -62,7 +49,6 @@ st.set_page_config(layout="wide", page_title="バナスコAI - 実績記録")
 auth_utils.check_login()
 
 # --- CSS ---
-# (CSS部分は省略せずに全て含んでいます)
 st.markdown(
     """
     <style>
@@ -148,7 +134,8 @@ try:
                     st.error("保存に失敗しました。")
     
     with col2:
-        df_for_download = edited_df.drop(columns=['id', 'image_url', 'created_at'], errors='ignore')
+        # PDFダウンロード用に、表示されている列のみを対象にする
+        df_for_download = edited_df.drop(columns=['id', 'image_url'], errors='ignore')
         
         pdf_data = dataframe_to_pdf(df_for_download)
         if pdf_data:
