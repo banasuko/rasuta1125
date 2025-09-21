@@ -11,3 +11,4 @@ oauth2client
 stripe
 flask
 gunicorn
+fpdf2
