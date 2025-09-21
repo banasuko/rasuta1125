@@ -7,6 +7,7 @@ import firebase_admin
 from firebase_admin import credentials, firestore, storage
 import json
 from datetime import datetime, timezone
+import pandas as pd
 
 # .envファイルから環境変数を読み込む
 load_dotenv()
@@ -178,13 +179,28 @@ def save_diagnosis_records_to_firestore(uid, records_df):
     # DataFrameの各行を新しいドキュメントとして追加
     for _, row in records_df.iterrows():
         record_data = row.to_dict()
-        if 'id' in record_data:
-            del record_data['id']
-        # タイムスタンプをFirestoreのTimestamp型に変換
+        
+        # 'id'列はFirestoreに不要なので削除
+        doc_id = record_data.pop('id', None)
+        
+        # ★★★ ここから変更 ★★★
+        # 既存のタイムスタンプを保持し、ない場合のみ新規作成
         if 'created_at' in record_data and pd.notna(record_data['created_at']):
-             record_data['created_at'] = firestore.SERVER_TIMESTAMP
-        user_diagnoses_ref.add(record_data)
+            # DataFrameから来たタイムスタンプをそのまま利用
+            pass
+        else:
+            # 新規行の場合はサーバータイムスタンプを設定
+            record_data['created_at'] = firestore.SERVER_TIMESTAMP
+        # ★★★ ここまで変更 ★★★
+
+        # もし元のドキュメントIDがあればそれを使う（通常は新しいIDが自動生成される）
+        if doc_id and pd.notna(doc_id):
+            user_diagnoses_ref.document(doc_id).set(record_data)
+        else:
+            user_diagnoses_ref.add(record_data)
+            
     return True
+
 
 def upload_image_to_firebase_storage(uid, image_bytes_io, filename):
     try:
