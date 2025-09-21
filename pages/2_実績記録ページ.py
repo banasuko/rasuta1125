@@ -1,24 +1,33 @@
 import streamlit as st
 import pandas as pd
-import sys
-import os
 from datetime import datetime
 from fpdf import FPDF
 
-# --- ▼▼▼ このブロックを追加 ▼▼▼ ---
-# プロジェクトのルートディレクトリをPythonのパスに追加
-# これにより、別階層にあるファイルを正しくインポートできる
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-# --- ▲▲▲ このブロックを追加 ▲▲▲ ---
+# --- ▼▼▼ ご提示いただいた修正コードを反映 ▼▼▼ ---
+import os
+import sys
 
+# 現在のファイルのディレクトリを取得
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+# プロジェクトのルートディレクトリを取得 (1階層上)
+ROOT_DIR = os.path.abspath(os.path.join(CURRENT_DIR, ".."))
+
+# ルートディレクトリをPythonのパスに追加（まだ追加されていなければ）
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
+
+# firestore_clientとauth_utilsをインポート
 from firestore_client import get_firestore_db
 import auth_utils
+# --- ▲▲▲ ここまでが修正箇所 ▲▲▲ ---
+
 
 # ---------------------------
 # ページ設定 & ログインチェック
 # ---------------------------
 st.set_page_config(layout="wide", page_title="バナスコAI - 実績記録")
 auth_utils.check_login()
+
 
 # ---------------------------
 # Firestoreからデータ取得
@@ -36,6 +45,7 @@ def get_user_records(user_id):
         df['timestamp'] = pd.to_datetime(df['timestamp'])
     return df
 
+
 # ---------------------------
 # PDF生成関数
 # ---------------------------
@@ -43,22 +53,23 @@ def create_pdf(dataframe):
     pdf = FPDF()
     pdf.add_page()
 
-    # 日本語フォントを追加
-    font_path = os.path.join(os.path.dirname(__file__), '..', 'NotoSansJP-Regular.ttf')
+    # 日本語フォントを追加 (プロジェクトルートからのパスを指定)
+    font_path = os.path.join(ROOT_DIR, 'NotoSansJP-Regular.ttf')
     try:
         if os.path.exists(font_path):
             pdf.add_font('NotoSansJP', '', font_path, uni=True)
             pdf.set_font('NotoSansJP', '', 10)
         else:
-            raise FileNotFoundError("フォントファイルが見つかりません。")
+            raise FileNotFoundError("フォントファイル 'NotoSansJP-Regular.ttf' が見つかりません。")
     except Exception as e:
         st.warning(f"日本語フォントの読み込みに失敗しました。PDFは標準フォントで生成されます。エラー: {e}")
         pdf.set_font('Arial', '', 10)
 
     # ヘッダー
     col_widths = {'日付': 30, 'カテゴリ': 35, 'ターゲット': 45, '生成コピー': 80}
+    pdf.set_fill_color(240, 240, 240) # ヘッダー背景色
     for col_name, width in col_widths.items():
-        pdf.cell(width, 10, col_name, border=1, ln=0, align='C')
+        pdf.cell(width, 10, col_name, border=1, ln=0, align='C', fill=True)
     pdf.ln()
 
     # データ行
@@ -113,7 +124,7 @@ else:
     })
 
     # 日付で降順にソート
-    if '日付' in display_df.columns:
+    if '日付' in display_df.columns and not display_df['日付'].isnull().all():
         display_df = display_df.sort_values(by='日付', ascending=False)
         # 日付のフォーマットを 'YYYY-MM-DD HH:MM' に変更
         display_df['日付'] = display_df['日付'].dt.strftime('%Y-%m-%d %H:%M')
