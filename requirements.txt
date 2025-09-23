@@ -12,3 +12,4 @@ stripe
 flask
 gunicorn
 fpdf2
+resend>=0.6.0
