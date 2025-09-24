@@ -1,156 +1,129 @@
+import os, re, time, json, requests
 import streamlit as st
-import re
-import time
-import random
-import resend
-import requests
-from typing import List, Tuple
+from datetime import datetime, timezone, timedelta
 
-# --- ここからメール送信機能（旧mailer.pyの内容） ---
+# ---------------------------
+# ページ設定
+# ---------------------------
+st.set_page_config(page_title="お問い合わせ", layout="centered")
 
-def _get_secrets() -> Tuple:
-    """
-    Streamlitのsecretsから設定を安全に読み込む
-    """
-    required_secrets = ["MAIL_PROVIDER", "MAIL_FROM", "MAIL_TO_1", "MAIL_TO_2"]
-    for secret in required_secrets:
-        if secret not in st.secrets:
-            raise ValueError(f"シークレット '{secret}' が設定されていません。")
+# --- CSS：ハニーポットを完全に不可視化（DOM上にあるが見えない） ---
+st.markdown("""
+<style>
+input[placeholder="__banasuko_hp__"]{ 
+  position: absolute !important; 
+  left: -10000px !important; 
+  width: 1px !important; 
+  height: 1px !important; 
+  opacity: 0 !important; 
+  pointer-events: none !important; 
+}
+</style>
+""", unsafe_allow_html=True)
 
-    provider = st.secrets["MAIL_PROVIDER"].lower()
-    mail_from = st.secrets["MAIL_FROM"]
-    mail_to = [st.secrets["MAIL_TO_1"], st.secrets["MAIL_TO_2"]]
+# ---------------------------
+# 環境変数（st.secrets 経由）
+# ---------------------------
+MAIL_PROVIDER = st.secrets.get("MAIL_PROVIDER", "resend").lower()
+RESEND_API_KEY = st.secrets.get("RESEND_API_KEY", "")
+MAIL_FROM      = st.secrets.get("MAIL_FROM", "no-reply@banasuko.ai")
+MAIL_TO_1      = st.secrets.get("MAIL_TO_1", "")
+MAIL_TO_2      = st.secrets.get("MAIL_TO_2", "")
 
-    api_key, domain = "", ""
-    if provider == "resend":
-        if "RESEND_API_KEY" not in st.secrets:
-            raise ValueError("MAIL_PROVIDERがresendですが、RESEND_API_KEYが設定されていません。")
-        api_key = st.secrets["RESEND_API_KEY"]
-    elif provider == "mailgun":
-        if "MAILGUN_API_KEY" not in st.secrets or "MAILGUN_DOMAIN" not in st.secrets:
-            raise ValueError("MAIL_PROVIDERがmailgunですが、MAILGUN_API_KEYまたはMAILGUN_DOMAINが設定されていません。")
-        api_key = st.secrets["MAILGUN_API_KEY"]
-        domain = st.secrets["MAILGUN_DOMAIN"]
-    else:
-        raise ValueError(f"サポートされていないMAIL_PROVIDERです: {provider}")
-    return provider, api_key, domain, mail_from, mail_to
+# 送信レート制限（同一セッション60秒）
+if "last_submit_at" not in st.session_state:
+    st.session_state.last_submit_at = 0.0
 
-def _send_with_resend(api_key: str, mail_from: str, mail_to: List[str], subject: str, body_html: str, reply_to: str) -> bool:
-    try:
-        resend.api_key = api_key
-        response = resend.Emails.send(
-            from_=mail_from, to=mail_to, subject=subject, html=body_html, reply_to=reply_to
-        )
-        return 'id' in response
-    except Exception as e:
-        st.error(f"Resendでのメール送信中にエラーが発生しました: {e}")
-        return False
+JST = timezone(timedelta(hours=9))
 
-def _send_with_mailgun(api_key: str, domain: str, mail_from: str, mail_to: List[str], subject: str, body_html: str, reply_to: str) -> bool:
-    try:
-        response = requests.post(
-            f"https://api.mailgun.net/v3/{domain}/messages",
-            auth=("api", api_key),
-            data={"from": mail_from, "to": mail_to, "subject": subject, "html": body_html, "h:Reply-To": reply_to}
-        )
-        response.raise_for_status()
-        return response.status_code == 200
-    except requests.exceptions.RequestException as e:
-        st.error(f"Mailgunでのメール送信中にエラーが発生しました: {e}")
-        return False
+# ---------------------------
+# バリデーション系
+# ---------------------------
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
-def send_contact_email(name: str, email: str, message: str) -> bool:
-    """
-    お問い合わせ内容を運営者にメールで送信するメイン関数
-    """
-    try:
-        provider, api_key, domain, mail_from, mail_to = _get_secrets()
-    except ValueError as e:
-        st.error(f"設定エラー: {e}")
-        return False
+def validate(email: str, message: str, agree: bool, honeypot: str):
+    if honeypot.strip():  # bot が埋めたら即NG
+        return False, "不正な送信が検出されました。"
+    if not email or not EMAIL_RE.match(email):
+        return False, "メールアドレスの形式が正しくありません。"
+    if not message or len(message.strip()) == 0:
+        return False, "お問い合わせ内容は必須です。"
+    if len(message) > 1000:
+        return False, "お問い合わせ内容は1000文字以内で入力してください。"
+    if not agree:
+        return False, "個人情報の取り扱いに同意が必要です。"
+    # レート制限
+    now = time.time()
+    if now - st.session_state.last_submit_at < 60:
+        return False, "短時間に複数回の送信はできません。1分ほど時間をあけてお試しください。"
+    return True, ""
 
-    subject = f"【BanasukoAI】お問い合わせがありました（{name or '匿名'}様より）"
-    body_html = f"""
-    <html>
-    <body style="font-family: sans-serif;">
-        <h2>BanasukoAIにお問い合わせがありました。</h2><hr>
-        <p><strong>お名前:</strong> {name or '未入力'}</p>
-        <p><strong>メールアドレス (返信先):</strong> {email}</p>
-        <p><strong>お問い合わせ内容:</strong></p>
-        <pre style="white-space: pre-wrap; word-wrap: break-word; background-color: #f4f4f4; padding: 15px; border-radius: 5px;">{message}</pre><hr>
-        <p style="color: #888; font-size: 12px;">このメールはウェブサイトのお問い合わせフォームから送信されました。</p>
-    </body>
-    </html>
-    """
-    if provider == "resend":
-        return _send_with_resend(api_key, mail_from, mail_to, subject, body_html, reply_to=email)
-    elif provider == "mailgun":
-        return _send_with_mailgun(api_key, domain, mail_from, mail_to, subject, body_html, reply_to=email)
-    return False
+def send_email_via_resend(name: str, email: str, message: str):
+    if MAIL_PROVIDER != "resend":
+        raise RuntimeError("MAIL_PROVIDER は 'resend' を指定してください。")
 
-# --- ここから画面表示機能 ---
+    if not RESEND_API_KEY or not MAIL_TO_1 or not MAIL_TO_2 or not MAIL_FROM:
+        raise RuntimeError("メール送信の設定が不足しています（secrets を確認してください）。")
 
-st.set_page_config(layout="wide", page_title="お問い合わせ")
+    sent_at = datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S %Z")
+    subject = "[お問い合わせ] バナスコ"
+    body = f"""お名前: {name or '（未記入）'}
+メール: {email}
+送信日時: {sent_at}
 
-st.markdown(
-    """
-    <style>
-    .stApp { background: linear-gradient(135deg, #0f0f1a 0%, #1a1c29 15%, #2d3748 35%, #1a202c 50%, #2d3748 65%, #4a5568 85%, #2d3748 100%) !important; background-attachment: fixed; }
-    .main .block-container { background: rgba(26, 32, 44, 0.4) !important; backdrop-filter: blur(60px) !important; border: 2px solid rgba(255, 255, 255, 0.1) !important; border-radius: 32px !important; padding: 5rem 4rem !important; margin: 2rem auto !important; max-width: 900px !important; }
-    .stButton > button { background: linear-gradient(135deg, #38bdf8 0%, #a855f7 50%, #06d6a0 100%) !important; color: #ffffff !important; border: none !important; border-radius: 60px !important; font-weight: 700 !important; font-size: 1.1rem !important; padding: 1.25rem 3rem !important; width: 100% !important; }
-    div[data-baseweb="input"] input, div[data-baseweb="textarea"] textarea { background: #1a1c29 !important; color: #FBC02D !important; border: 2px solid rgba(255, 255, 255, 0.2) !important; border-radius: 16px !important; }
-    h1, .stTitle { font-size: 3.5rem !important; font-weight: 900 !important; background: linear-gradient(135deg, #38bdf8, #a855f7, #3b82f6, #06d6a0, #f59e0b, #38bdf8) !important; background-size: 600% 600% !important; -webkit-background-clip: text !important; -webkit-text-fill-color: transparent !important; text-align: center !important; animation: mega-gradient-shift 12s ease-in-out infinite !important; }
-    @keyframes mega-gradient-shift { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
-    p, div, span, label, .stMarkdown, .stCheckbox { color: #ffffff !important; }
-    #MainMenu, footer, header { visibility: hidden; }
-    </style>
-    """,
-    unsafe_allow_html=True
+--- お問い合わせ内容 ---
+{message}
+"""
+
+    # Resend API（https://resend.com/docs/api-reference/emails/send）
+    url = "https://api.resend.com/emails"
+    payload = {
+        "from": MAIL_FROM,
+        "to": [MAIL_TO_1, MAIL_TO_2],   # ← 宛先はサーバ側のみ
+        "subject": subject,
+        "text": body,
+        "reply_to": email,               # 運営がそのまま返信できる
+    }
+    headers = {"Authorization": f"Bearer {RESEND_API_KEY}", "Content-Type": "application/json"}
+
+    resp = requests.post(url, headers=headers, data=json.dumps(payload), timeout=20)
+    if resp.status_code >= 300:
+        raise RuntimeError(f"Resend API エラー: {resp.status_code} {resp.text}")
+
+# ---------------------------
+# UI
+# ---------------------------
+st.title("お問い合わせ")
+
+st.write(
+    "以下のフォームにご入力ください。**返信は3営業日以内**にメールでご連絡します。"
+    "\n\n**営業時間：火曜〜金曜 10:00–17:00（JST）**｜**電話での問い合わせは受け付けておりません。**"
 )
 
-def is_valid_email(email):
-    return re.match(r"(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)", email)
-
-if 'last_submission_time' not in st.session_state:
-    st.session_state.last_submission_time = 0
-
-st.title("✉️ お問い合わせ")
-st.markdown("ご意見、ご感想、不具合の報告などはこちらからお送りください。")
-st.markdown("---")
-
-with st.form(key='contact_form'):
+with st.form("contact_form", clear_on_submit=True):
     name = st.text_input("お名前（任意）", max_chars=50, placeholder="山田 太郎")
     email = st.text_input("メールアドレス（必須）", placeholder="your-email@example.com")
-    message = st.text_area("お問い合わせ内容（必須）", max_chars=1000, height=200, placeholder="サービスに関するご質問や、改善のご要望などをご自由にお書きください。")
-    honeypot = st.text_input("このフィールドは入力しないでください", key="honeypot", label_visibility="collapsed")
+    message = st.text_area("お問い合わせ内容（必須）", height=180, 
+                           placeholder="サービスに関するご質問や改善のご要望などをご自由にお書きください。")
+    # 完全不可視のハニーポット（見えない／触れない）
+    honeypot = st.text_input("", key="hp", label_visibility="collapsed", placeholder="__banasuko_hp__")
     agree = st.checkbox("個人情報の取り扱いに同意します。（プライバシーポリシー）")
+
     submitted = st.form_submit_button("送信する")
 
 if submitted:
-    if time.time() - st.session_state.last_submission_time < 60:
-        st.error("エラー: 送信頻度が高すぎます。1分後に再度お試しください。")
-    elif honeypot:
-        st.success("お問い合わせありがとうございます。")
-    elif not email or not message or not agree:
-        st.error("エラー: 必須項目をすべて入力してください。")
-    elif not is_valid_email(email):
-        st.error("エラー: 正しい形式のメールアドレスを入力してください。")
+    ok, err = validate(email, message, agree, honeypot)
+    if not ok:
+        st.error(err)
     else:
-        with st.spinner("メッセージを送信中です..."):
-            # ローカル関数を直接呼び出す
-            success = send_contact_email(name, email, message)
-        if success:
-            st.success("✅ お問い合わせありがとうございます。3営業日以内にご連絡いたします。")
-            st.session_state.last_submission_time = time.time()
-        else:
-            st.error("❌ 送信に失敗しました。時間をおいて再度お試しください。")
-
-st.markdown("---")
-st.subheader("ご案内")
-st.info(
-    """
-    - **返信は3営業日以内**にご連絡いたします。
-    - **営業時間：火曜〜金曜 10:00–17:00（JST）**
-    - **電話での問い合わせは受け付けておりません。**
-    """
-)
+        try:
+            send_email_via_resend(name, email, message)
+            st.session_state.last_submit_at = time.time()
+            st.success(
+                "お問い合わせありがとうございます。送信が完了しました。"
+                "担当より**3営業日以内**にメールでご連絡します。営業時間：火〜金 10:00–17:00。"
+                " **電話対応は行っておりません。**"
+            )
+        except Exception as e:
+            # 内部情報を出しすぎない
+            st.error("送信中にエラーが発生しました。時間をおいて再度お試しください。")
