@@ -12,4 +12,5 @@ stripe
 flask
 gunicorn
 fpdf2
-resend>=0.6.0
+streamlit>=1.36
+requests>=2.31
