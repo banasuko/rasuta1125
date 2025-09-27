@@ -7,8 +7,7 @@ import requests
 from PIL import Image
 from datetime import datetime
 from openai import OpenAI
-
-import auth_utils # Import Firebase authentication
+import auth_utils
 
 # ==============================================================================
 # ★★★ ここからが修正箇所 ① ★★★
@@ -71,7 +70,6 @@ st.set_page_config(layout="wide", page_title="バナスコAI")
 
 # --- Logo Display ---
 logo_path = "banasuko_logo_icon.png"
-
 try:
     logo_image = Image.open(logo_path)
     st.sidebar.image(logo_image, use_container_width=True)
@@ -96,19 +94,16 @@ st.markdown(
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@300;400;500;600;700&display=swap');
     
-    /* (CSSの全文は変更ありません) */
     .stApp {
         background: linear-gradient(135deg, #0f0f1a 0%, #1a1c29 15%, #2d3748 35%, #1a202c 50%, #2d3748 65%, #4a5568 85%, #2d3748 100%) !important;
         background-attachment: fixed;
         background-size: 400% 400%;
         animation: background-flow 15s ease-in-out infinite;
     }
-    
     @keyframes background-flow {
         0%, 100% { background-position: 0% 50%; }
         50% { background-position: 100% 50%; }
     }
-    
     body {
         background: transparent !important;
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
@@ -128,7 +123,6 @@ st.markdown(
         max-width: 1400px !important;
         min-height: 95vh !important;
     }
-    
     .main .block-container::before {
         content: '';
         position: absolute;
@@ -147,7 +141,6 @@ st.markdown(
         z-index: -1;
         animation: container-glow 8s ease-in-out infinite alternate;
     }
-    
     @keyframes container-glow {
         from { opacity: 0.3; }
         to { opacity: 0.7; }
@@ -158,11 +151,9 @@ st.markdown(
         border-right: 2px solid rgba(255, 255, 255, 0.1) !important;
         box-shadow: 8px 0 50px rgba(0, 0, 0, 0.5) !important;
     }
-    
     .stSidebar > div:first-child {
         background: transparent !important;
     }
-    
     .stButton > button {
         background: linear-gradient(135deg, #38bdf8 0%, #a855f7 50%, #06d6a0 100%) !important;
         color: #ffffff !important;
@@ -186,7 +177,6 @@ st.markdown(
         text-transform: uppercase !important;
         transform: perspective(1000px) translateZ(0);
     }
-    
     .stButton > button::before {
         content: '';
         position: absolute;
@@ -198,7 +188,6 @@ st.markdown(
         transition: left 0.8s;
         z-index: 1;
     }
-    
     .stButton > button:hover {
         background: linear-gradient(135deg, #0ea5e9 0%, #9333ea 50%, #059669 100%) !important;
         box-shadow: 
@@ -208,14 +197,12 @@ st.markdown(
             inset 0 2px 0 rgba(255, 255, 255, 0.4) !important;
         transform: translateY(-5px) scale(1.03) perspective(1000px) translateZ(20px) !important;
     }
-    
     .stButton > button:active {
         transform: translateY(-2px) scale(1.01) !important;
         box-shadow: 
             0 15px 30px rgba(56, 189, 248, 0.4),
             0 8px 20px rgba(168, 85, 247, 0.3) !important;
     }
-    
     div[data-baseweb="input"] input,
     div[data-baseweb="select"] span,
     div[data-baseweb="textarea"] textarea,
@@ -237,7 +224,6 @@ st.markdown(
         padding: 1rem 1.5rem !important;
         font-size: 1rem !important;
     }
-    
     div[data-baseweb="input"] input:focus,
     div[data-baseweb="select"] span:focus,
     div[data-baseweb="textarea"] textarea:focus,
@@ -253,7 +239,6 @@ st.markdown(
         transform: translateY(-2px) scale(1.01) !important;
         background: rgba(26, 32, 44, 0.9) !important;
     }
-    
     h1, .stTitle {
         font-size: 5rem !important;
         font-weight: 900 !important;
@@ -269,7 +254,6 @@ st.markdown(
         text-shadow: 0 0 80px rgba(56, 189, 248, 0.5) !important;
         transform: perspective(1000px) rotateX(10deg);
     }
-    
     @keyframes mega-gradient-shift {
         0%, 100% { background-position: 0% 50%; }
         20% { background-position: 100% 0%; }
@@ -277,7 +261,6 @@ st.markdown(
         60% { background-position: 50% 100%; }
         80% { background-position: 0% 100%; }
     }
-    
     h2, .stSubheader {
         color: #ffffff !important;
         font-family: 'Inter', sans-serif !important;
@@ -287,7 +270,6 @@ st.markdown(
         margin-bottom: 3rem !important;
         letter-spacing: 0.05em !important;
     }
-    
     h3, h4, h5, h6 {
         color: #ffffff !important;
         font-family: 'Inter', sans-serif !important;
@@ -300,7 +282,6 @@ st.markdown(
         font-weight: 400 !important;
         line-height: 1.7 !important;
     }
-    
     .stFileUploader {
         border: 3px dashed rgba(56, 189, 248, 0.7) !important;
         border-radius: 24px !important;
@@ -313,7 +294,6 @@ st.markdown(
         transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important;
         padding: 3rem !important;
     }
-    
     .stFileUploader:hover {
         border-color: rgba(168, 85, 247, 0.9) !important;
         background: rgba(26, 32, 44, 0.6) !important;
@@ -323,7 +303,6 @@ st.markdown(
             inset 0 2px 0 rgba(255, 255, 255, 0.2) !important;
         transform: translateY(-4px) scale(1.02) !important;
     }
-    
     .stImage > img {
         border: 3px solid rgba(56, 189, 248, 0.4) !important;
         border-radius: 20px !important;
@@ -332,7 +311,6 @@ st.markdown(
             0 0 60px rgba(56, 189, 248, 0.3) !important;
         transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important;
     }
-    
     .stImage > img:hover {
         transform: scale(1.03) translateY(-4px) !important;
         box-shadow: 
@@ -340,16 +318,13 @@ st.markdown(
             0 0 100px rgba(56, 189, 248, 0.5) !important;
         border-color: rgba(168, 85, 247, 0.6) !important;
     }
-    
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
-    
     ::-webkit-scrollbar { width: 12px; }
     ::-webkit-scrollbar-track { background: rgba(26, 32, 44, 0.4); border-radius: 6px; }
     ::-webkit-scrollbar-thumb { background: linear-gradient(135deg, #38bdf8, #a855f7); border-radius: 6px; box-shadow: 0 0 20px rgba(56, 189, 248, 0.5); }
     ::-webkit-scrollbar-thumb:hover { background: linear-gradient(135deg, #0ea5e9, #9333ea); box-shadow: 0 0 30px rgba(168, 85, 247, 0.7); }
-    
     .stTextInput input,
     .stTextArea textarea,
     div[data-baseweb="input"] input {
@@ -366,18 +341,15 @@ st.markdown(
     div[data-baseweb="input"] input:disabled {
       color: rgba(251, 192, 45, 0.5) !important;
     }
-    
     div[data-baseweb="select"] span,
     div[data-baseweb="select"] div[role="button"] {
       color: #FBC02D !important;
     }
-    
     div[data-baseweb="select"] svg {
       color: #FBC02D !important;
       fill: #FBC02D !important;
       opacity: 0.95 !important;
     }
-    
     [data-baseweb="popover"],
     [role="listbox"],
     [data-baseweb="menu"] {
@@ -392,7 +364,6 @@ st.markdown(
       background-color: #0b0d15 !important;
       transition: background 0.3s ease-in-out !important;
     }
-
     body [role="option"][aria-selected="true"],
     body [role="option"]:hover {
       background: linear-gradient(270deg, red, orange, yellow, green, blue, indigo, violet) !important;
@@ -400,7 +371,6 @@ st.markdown(
       animation: rainbow 5s ease infinite !important;
       color: white !important;
     }
-
     @keyframes rainbow {
         0%{background-position:0% 50%}
         50%{background-position:100% 50%}
@@ -485,11 +455,9 @@ with col1:
 
     # --- 追加機能 ---
     add_ctr = False
-    check_typos = False # check_typosは元のコードにあったので残しますが、プロンプトからは削除されています
     if user_plan not in ["Free", "Guest"]:
         with st.expander("高度な機能 (Lightプラン以上)"):
             add_ctr = st.checkbox("予想CTRを追加")
-            # 誤字脱字チェックは削除済み
 
     st.markdown("### 任意項目")
     with st.container():
@@ -505,10 +473,8 @@ with col1:
 
     if 'score_a' not in st.session_state: st.session_state.score_a = None
     if 'comment_a' not in st.session_state: st.session_state.comment_a = None
-    if 'yakujihou_a' not in st.session_state: st.session_state.yakujihou_a = None
     if 'score_b' not in st.session_state: st.session_state.score_b = None
     if 'comment_b' not in st.session_state: st.session_state.comment_b = None
-    if 'yakujihou_b' not in st.session_state: st.session_state.yakujihou_b = None
 
     # --- A Pattern Processing ---
     if uploaded_file_a:
@@ -521,24 +487,16 @@ with col1:
                     st.warning(f"残り回数がありません。（{user_plan}プラン）")
                     st.info("利用回数を増やすには、プランのアップグレードが必要です。")
                 else:
-                    if auth_utils.update_user_uses_in_firestore(st.session_state["user"]):
-                        st.session_state.remaining_uses -= 1
-                        image_a_bytes_io = io.BytesIO()
-                        Image.open(uploaded_file_a).save(image_a_bytes_io, format="PNG")
-                        image_a_bytes = image_a_bytes_io.getvalue()
-                        
-                        image_filename_a = f"banner_A_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
-                        
-                        image_url_a = auth_utils.upload_image_to_firebase_storage(
-                            st.session_state["user"], image_a_bytes_io, image_filename_a
-                        )
+                    with st.spinner("AIがAパターンを採点中です..."):
+                        try:
+                            # 画像データをバイト形式で取得
+                            image_a_bytes_io = io.BytesIO()
+                            Image.open(uploaded_file_a).save(image_a_bytes_io, format="PNG")
+                            image_a_bytes = image_a_bytes_io.getvalue()
 
-                        if image_url_a:
-                            with st.spinner("AIがAパターンを採点中です..."):
-                                try:
-                                    ctr_instruction = "また、このバナー広告の予想CTR（クリックスルー率）もパーセンテージで示してください。" if add_ctr else ""
-                                    
-                                    ai_prompt_text = f"""
+                            # AIプロンプトの構築
+                            ctr_instruction = "また、このバナー広告の予想CTR（クリックスルー率）もパーセンテージで示してください。" if add_ctr else ""
+                            ai_prompt_text = f"""
 以下のバナー画像をプロ視点で採点してください。
 この広告のターゲット年代は「{age_group}」で、主な目的は「{purpose}」です。
 【評価基準】
@@ -555,46 +513,59 @@ with col1:
 改善コメント：2～3行でお願いします
 { "予想CTR：X.X%" if add_ctr else "" }
 ---"""
-                                    # ==============================================================================
-                                    # ★★★ ここからが修正箇所 ② ★★★
-                                    # ------------------------------------------------------------------------------
-                                    content_a = get_ai_diagnosis(image_a_bytes, ai_prompt_text, CACHE_VERSION, client)
-                                    # ------------------------------------------------------------------------------
-                                    # ★★★ ここまでが修正箇所 ② ★★★
-                                    # ==============================================================================
+                            
+                            # ==============================================================================
+                            # ★★★ ここからが修正箇所 ② ★★★
+                            # ------------------------------------------------------------------------------
+                            # キャッシュ対応のAI関数を呼び出し
+                            content_a = get_ai_diagnosis(image_a_bytes, ai_prompt_text, CACHE_VERSION, client)
+                            # ------------------------------------------------------------------------------
+                            # ★★★ ここまでが修正箇所 ② ★★★
+                            # ==============================================================================
+                            
+                            # 利用回数の更新とFirestoreへの記録は、AI呼び出し後に行う
+                            if auth_utils.update_user_uses_in_firestore(st.session_state["user"]):
+                                st.session_state.remaining_uses -= 1
+                                image_filename_a = f"banner_A_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
+                                image_url_a = auth_utils.upload_image_to_firebase_storage(
+                                    st.session_state["user"], image_a_bytes_io, image_filename_a
+                                )
 
-                                    st.session_state.ai_response_a = content_a
+                                if user_plan in ["Pro", "Team", "Enterprise"] and image_url_a:
                                     score_match_a = re.search(r"スコア[:：]\s*(.+)", content_a)
                                     comment_match_a = re.search(r"改善コメント[:：]\s*(.+)", content_a, re.DOTALL)
                                     ctr_match_a = re.search(r"予想CTR[:：]\s*(.+)", content_a)
                                     
-                                    st.session_state.score_a = score_match_a.group(1).strip() if score_match_a else "取得できず"
-                                    st.session_state.comment_a = comment_match_a.group(1).strip() if comment_match_a else "取得できず"
-                                    st.session_state.ctr_a = ctr_match_a.group(1).strip() if ctr_match_a else None
+                                    firestore_record_data = {
+                                        "user_name": sanitize(user_name), "banner_name": sanitize(banner_name), "pattern": "A",
+                                        "platform": sanitize(platform), "category": sanitize(category), "industry": sanitize(industry),
+                                        "age_group": sanitize(age_group), "purpose": sanitize(purpose), "genre": sanitize(genre),
+                                        "score": sanitize(score_match_a.group(1).strip() if score_match_a else "取得できず"),
+                                        "comment": sanitize(comment_match_a.group(1).strip() if comment_match_a else "取得できず"),
+                                        "predicted_ctr": sanitize(ctr_match_a.group(1).strip() if ctr_match_a else None) if add_ctr else "N/A",
+                                        "result": sanitize(result_input), "follower_gain": sanitize(follower_gain_input), "memo": sanitize(memo_input),
+                                        "image_url": image_url_a
+                                    }
+                                    if auth_utils.add_diagnosis_record_to_firestore(st.session_state["user"], firestore_record_data):
+                                        st.success("診断結果を実績記録ページに記録しました！")
+                                    else:
+                                        st.error("診断結果の記録に失敗しました。")
+                            else:
+                                st.error("利用回数の更新に失敗しました。")
 
-                                    if user_plan in ["Pro", "Team", "Enterprise"]:
-                                        firestore_record_data = {
-                                            "user_name": sanitize(user_name), "banner_name": sanitize(banner_name), "pattern": "A",
-                                            "platform": sanitize(platform), "category": sanitize(category), "industry": sanitize(industry),
-                                            "age_group": sanitize(age_group), "purpose": sanitize(purpose), "genre": sanitize(genre),
-                                            "score": sanitize(st.session_state.score_a), "comment": sanitize(st.session_state.comment_a),
-                                            "predicted_ctr": sanitize(st.session_state.ctr_a) if add_ctr else "N/A",
-                                            "result": sanitize(result_input), "follower_gain": sanitize(follower_gain_input), "memo": sanitize(memo_input),
-                                            "image_url": image_url_a
-                                        }
-                                        if auth_utils.add_diagnosis_record_to_firestore(st.session_state["user"], firestore_record_data):
-                                            st.success("診断結果を実績記録ページに記録しました！")
-                                        else:
-                                            st.error("診断結果の記録に失敗しました。")
+                            # 画面表示用の結果をパースしてsession_stateに保存
+                            score_match_a = re.search(r"スコア[:：]\s*(.+)", content_a)
+                            comment_match_a = re.search(r"改善コメント[:：]\s*(.+)", content_a, re.DOTALL)
+                            ctr_match_a = re.search(r"予想CTR[:：]\s*(.+)", content_a)
+                            
+                            st.session_state.score_a = score_match_a.group(1).strip() if score_match_a else "取得できず"
+                            st.session_state.comment_a = comment_match_a.group(1).strip() if comment_match_a else "取得できず"
+                            st.session_state.ctr_a = ctr_match_a.group(1).strip() if ctr_match_a else None
 
-                                except Exception as e:
-                                    st.error(f"AI採点中にエラーが発生しました（Aパターン）: {str(e)}")
-                                    st.session_state.score_a = "エラー"
-                                    st.session_state.comment_a = "AI応答エラー"
-                        else:
-                            st.error("画像アップロードに失敗したため、採点を行いませんでした。")
-                    else:
-                        st.error("利用回数の更新に失敗しました。")
+                        except Exception as e:
+                            st.error(f"AI採点中にエラーが発生しました（Aパターン）: {str(e)}")
+                            st.session_state.score_a = "エラー"
+                            st.session_state.comment_a = "AI応答エラー"
                 st.rerun() 
         
         with result_col_a:
@@ -616,11 +587,8 @@ with col1:
         with img_col_b:
             st.image(Image.open(uploaded_file_b), caption="Bパターン画像", use_container_width=True)
             if st.button("Bパターンを採点", key="score_b_button"):
-                if remaining_uses <= 0:
-                    st.warning(f"残り回数がありません。（{user_plan}プラン）")
-                else:
-                    # (Bパターンの採点ロジックも、Aパターンと同様にキャッシュ対応関数を呼び出すように修正してください)
-                    pass
+                # (Bパターンの採点ロジックも、Aパターンと同様にキャッシュ対応関数を呼び出すように修正してください)
+                pass
         with result_col_b:
             if st.session_state.score_b:
                 st.markdown("### 🎯 Bパターン診断結果")
