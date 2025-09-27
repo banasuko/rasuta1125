@@ -587,8 +587,11 @@ with col1:
         with img_col_b:
             st.image(Image.open(uploaded_file_b), caption="Bパターン画像", use_container_width=True)
             if st.button("Bパターンを採点", key="score_b_button"):
-                # (Bパターンの採点ロジックも、Aパターンと同様にキャッシュ対応関数を呼び出すように修正してください)
-                pass
+                if remaining_uses <= 0:
+                    st.warning(f"残り回数がありません。（{user_plan}プラン）")
+                else:
+                    # (Bパターンの採点ロジックも、Aパターンと同様にキャッシュ対応関数を呼び出すように修正してください)
+                    pass
         with result_col_b:
             if st.session_state.score_b:
                 st.markdown("### 🎯 Bパターン診断結果")
