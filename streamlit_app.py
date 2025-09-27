@@ -54,7 +54,6 @@ def get_ai_diagnosis(_image_bytes, _prompt, _cache_version, client):
 # ★★★ ここまでが修正箇所 ① ★★★
 # ==============================================================================
 
-
 # Google Apps Script (GAS) and Google Drive information
 GAS_URL = "https://script.google.com/macros/s/AKfycby_uD6Jtb9GT0-atbyPKOPc8uyVKodwYVIQ2Tpe-_E8uTOPiir0Ce1NAPZDEOlCUxN4/exec"
 
@@ -489,10 +488,16 @@ with col1:
                 else:
                     with st.spinner("AIがAパターンを採点中です..."):
                         try:
-                            # 画像データをバイト形式で取得
+                            # ==============================================================================
+                            # ★★★ ここからが修正箇所 ② ★★★
+                            # ------------------------------------------------------------------------------
+                            # 画像データをバイト形式で取得し、同時にアップロード用のIOオブジェクトも準備
                             image_a_bytes_io = io.BytesIO()
                             Image.open(uploaded_file_a).save(image_a_bytes_io, format="PNG")
                             image_a_bytes = image_a_bytes_io.getvalue()
+                            # ------------------------------------------------------------------------------
+                            # ★★★ ここまでが修正箇所 ② ★★★
+                            # ==============================================================================
 
                             # AIプロンプトの構築
                             ctr_instruction = "また、このバナー広告の予想CTR（クリックスルー率）もパーセンテージで示してください。" if add_ctr else ""
@@ -514,14 +519,8 @@ with col1:
 { "予想CTR：X.X%" if add_ctr else "" }
 ---"""
                             
-                            # ==============================================================================
-                            # ★★★ ここからが修正箇所 ② ★★★
-                            # ------------------------------------------------------------------------------
                             # キャッシュ対応のAI関数を呼び出し
                             content_a = get_ai_diagnosis(image_a_bytes, ai_prompt_text, CACHE_VERSION, client)
-                            # ------------------------------------------------------------------------------
-                            # ★★★ ここまでが修正箇所 ② ★★★
-                            # ==============================================================================
                             
                             # 利用回数の更新とFirestoreへの記録は、AI呼び出し後に行う
                             if auth_utils.update_user_uses_in_firestore(st.session_state["user"]):
@@ -590,7 +589,7 @@ with col1:
                 if remaining_uses <= 0:
                     st.warning(f"残り回数がありません。（{user_plan}プラン）")
                 else:
-                    # (Bパターンの採点ロジックも、Aパターンと同様にキャッシュ対応関数を呼び出すように修正してください)
+                    # (Bパターンの採点ロジックも、Aパターンと同様に修正してください)
                     pass
         with result_col_b:
             if st.session_state.score_b:
