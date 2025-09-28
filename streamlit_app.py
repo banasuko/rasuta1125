@@ -18,13 +18,22 @@ CACHE_VERSION = "1.0"
 
 # AI採点（キャッシュ対応）関数
 @st.cache_data
-# client引数を削除。関数内ではグローバルスコープのclientを直接使用する
-def get_ai_diagnosis(_image_bytes, _prompt, _cache_version):
+def get_ai_diagnosis(_image_bytes, _prompt, _cache_version, client):
     """
     AIによる画像診断を実行し、結果をキャッシュします。
+    同じ画像と同じプロンプトの組み合わせに対しては、キャッシュされた結果を返します。
+    
+    Args:
+        _image_bytes (bytes): 診断する画像のバイトデータ。
+        _prompt (str): AIへの指示プロンプト。
+        _cache_version (str): キャッシュを管理するためのバージョン文字列。
+        client (OpenAI): OpenAIのクライアントインスタンス。
+
+    Returns:
+        str: AIからの診断結果テキスト。
     """
-    # グローバルスコープのclientがNone（APIキー未設定）の場合の処理
-    if client is None:
+    if not client:
+        # デモモード用のダミーレスポンス
         return "---\nスコア：A+\n改善コメント：プロフェッショナルなデザインで非常に優秀です。\n予想CTR：5.5%\n---"
     
     img_str = base64.b64encode(_image_bytes).decode()
@@ -38,7 +47,7 @@ def get_ai_diagnosis(_image_bytes, _prompt, _cache_version):
             ]}
         ],
         max_tokens=600,
-        temperature=0 # 結果を決定論的にするため、温度を0に固定
+        temperature=0 # ★ 結果を決定論的にするため、温度を0に固定
     )
     return response.choices[0].message.content
 # ------------------------------------------------------------------------------
@@ -65,7 +74,7 @@ try:
     logo_image = Image.open(logo_path)
     st.sidebar.image(logo_image, use_container_width=True)
 except FileNotFoundError:
-    st.sidebar.error(f"ロゴ画像 '{logo_path}' が見つかりません。")
+    st.sidebar.error(f"ロゴ画像 '{logo_path}' が見つかりません。ファイルが正しく配置されているか確認してください。")
 
 # --- Login Check ---
 auth_utils.check_login()
@@ -85,6 +94,7 @@ st.markdown(
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@300;400;500;600;700&display=swap');
     
+    /* (CSSの全文は変更ありません) */
     .stApp {
         background: linear-gradient(135deg, #0f0f1a 0%, #1a1c29 15%, #2d3748 35%, #1a202c 50%, #2d3748 65%, #4a5568 85%, #2d3748 100%) !important;
         background-attachment: fixed;
@@ -514,7 +524,7 @@ with col1:
 ---"""
                             
                             # キャッシュ対応のAI関数を呼び出し
-                            content_a = get_ai_diagnosis(image_a_bytes, ai_prompt_text, CACHE_VERSION)
+                            content_a = get_ai_diagnosis(image_a_bytes, ai_prompt_text, CACHE_VERSION, client)
                             
                             # 利用回数の更新とFirestoreへの記録は、AI呼び出し後に行う
                             if auth_utils.update_user_uses_in_firestore(st.session_state["user"]):
